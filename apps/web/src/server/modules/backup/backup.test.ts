@@ -11,7 +11,7 @@ import { eq, getTableColumns, getTableName, sql } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { archiveName, MAX_UPLOAD_BYTES } from "../../../lib/backup.ts";
 import { bodyLimit } from "../../body-limit.ts";
 import { decrypt, encrypt } from "../../crypto.ts";
@@ -25,8 +25,8 @@ import { createAccount } from "../accounts/index.ts";
 import { resetTasksForTests } from "../tasks/index.ts";
 import { type Manifest, openArchive, sealArchive } from "./archive.ts";
 import { FAST_KDF } from "./container.ts";
-import { compatibility, dumpContents, knownMigrations, restoreDatabase, SECRET_COLUMNS, withDatabase } from "./database.ts";
-import { auditRestored, restorableList } from "./guard.ts";
+import { compatibility, dumpContents, knownMigrations, migrateTo, restoreDatabase, SECRET_COLUMNS, withDatabase } from "./database.ts";
+import { auditRestored, matchReference, restorableList } from "./guard.ts";
 import {
   confirmBackupRestore,
   deleteTarget,
@@ -129,6 +129,28 @@ it("lets only the restore upload send up to 2 GB", () => {
   expect(bodyLimit("/api/backup/upload")).toBeGreaterThan(MAX_UPLOAD_BYTES);
   expect(bodyLimit("/api/backup/upload/x")).toBe(1024 * 1024);
   expect(bodyLimit("/api/backup/download")).toBe(1024 * 1024);
+});
+
+describe("migration levels", () => {
+  const known = [1, 2, 3].map((n) => ({ hash: String(n).repeat(64), createdAt: n * 1000 }));
+
+  it("takes the same or an older level when its migrations are a prefix of this build's", () => {
+    expect(compatibility(known, known)).toEqual({ ok: true, pending: 0 });
+    expect(compatibility(known.slice(0, 1), known)).toEqual({ ok: true, pending: 2 });
+    expect(compatibility([], known)).toEqual({ ok: true, pending: 3 });
+  });
+
+  it("refuses migrations that are not a prefix, and calls only a longer list newer", () => {
+    expect(compatibility([...known, { hash: "f".repeat(64), createdAt: 9000 }], known)).toEqual({ ok: false, reason: "newer" });
+    for (const applied of [
+      known.filter((_, index) => index !== 1),
+      known.toReversed(),
+      [{ hash: "e".repeat(64), createdAt: 1000 }],
+      [{ hash: "1".repeat(64), createdAt: 1001 }],
+    ]) {
+      expect(compatibility(applied, known)).toEqual({ ok: false, reason: "unknown" });
+    }
+  });
 });
 
 describe.skipIf(!tools)("backups", { timeout: 120_000 }, () => {
@@ -513,6 +535,32 @@ describe.skipIf(!tools)("backups", { timeout: 120_000 }, () => {
       }),
     ).rejects.toMatchObject({ text: { key: "backup.errors.newerSchema" } });
     await rm(newer);
+
+    const gap = current.migrations.applied.filter((_, index) => index !== 1);
+    const foreign = join(dir, "foreign.saldo-backup");
+    const foreignManifest = { ...current, migrations: { ...current.migrations, applied: gap, count: gap.length } };
+    await pipeline(
+      Readable.from(await sealArchive(foreignManifest, Readable.from([dump]), PASSPHRASE, { kdf: FAST_KDF })),
+      createWriteStream(foreign),
+    );
+    await expect(
+      prepareBackupRestore(db(), superuser, {
+        source: { kind: "upload", uploadId: await uploadFile(superuser, foreign) },
+        passphrase: PASSPHRASE,
+      }),
+    ).rejects.toMatchObject({ text: { key: "backup.errors.unknownSchema" } });
+    const { keys } = await openArchive(createReadStream(foreign), { passphrase: PASSPHRASE });
+    await expect(
+      restoreDatabase({
+        liveUrl: LIVE,
+        file: foreign,
+        keys,
+        manifest: foreignManifest,
+        currentKey: Buffer.from(env().ENCRYPTION_KEY, "base64"),
+      }),
+    ).rejects.toMatchObject({ text: { key: "backup.errors.unknownSchema" } });
+    expect(await databases(`${LIVE_NAME}_re`)).toEqual([]);
+    await rm(foreign);
     await expect(uploadFile(superuser, join(dir, "saldo", "notizen.txt"))).rejects.toMatchObject({
       text: { key: "backup.errors.notAnArchive" },
     });
@@ -622,6 +670,166 @@ describe.skipIf(!tools)("backups", { timeout: 120_000 }, () => {
       await live.client.end();
       await admin((client) => client.unsafe('drop database if exists "finanzen_test_backup_evil" with (force)'));
     }
+  });
+
+  describe("compared with a database built from the migrations", () => {
+    const EVIL = "finanzen_test_backup_evil";
+    const evil = withDatabase(BASE, EVIL);
+    const currentKey = () => Buffer.from(env().ENCRYPTION_KEY, "base64");
+    let live: { db: Db; client: postgres.Sql };
+
+    /** An archive of a database migrated to `level`, then changed by `plant`; the earlier checks all let it through. */
+    async function craftedArchive(plant: string, level = knownMigrations().length) {
+      const scratch = await mkdtemp(join(tmpdir(), "saldo-level-"));
+      try {
+        await admin(async (client) => {
+          await client.unsafe(`drop database if exists "${EVIL}" with (force)`);
+          await client.unsafe(`create database "${EVIL}"`);
+        });
+        await migrateTo(evil, level, scratch);
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
+      const client = postgres(evil, { max: 1, onnotice: () => {} });
+      try {
+        if (plant) await client.unsafe(plant);
+        await auditRestored(client);
+      } finally {
+        await client.end();
+      }
+      const archive = await createArchiveFile(evil, PASSPHRASE, archiveName(new Date()));
+      let list = "";
+      const { keys } = await openArchive(
+        createReadStream(archive.path),
+        { passphrase: PASSPHRASE },
+        {
+          onDump: async (dump) => {
+            list = await dumpContents(dump);
+          },
+        },
+      );
+      restorableList(list);
+      return { file: archive.path, keys, manifest: archive.manifest };
+    }
+
+    async function expectNothingLeft(): Promise<void> {
+      expect(await databases(LIVE_NAME)).toEqual([LIVE_NAME]);
+      expect(await live.db.select().from(settings).where(eq(settings.key, "only_in_live"))).toHaveLength(1);
+      await admin(async (client) => {
+        expect(await client`select rolname from pg_roles where rolname like ${`${LIVE_NAME}_restore_%`}`).toEqual([]);
+      });
+    }
+
+    beforeAll(async () => {
+      live = await freshLive();
+    });
+
+    afterAll(async () => {
+      await live.client.end();
+      await admin((client) => client.unsafe(`drop database if exists "${EVIL}" with (force)`));
+    });
+
+    it.each([
+      {
+        name: "a column default calling a function",
+        plant: "alter table public.settings alter column ciphertext set default current_setting('is_superuser')",
+        object: /^"COLUMN public\.settings\.ciphertext"$/,
+      },
+      {
+        name: "a planted call in an existing default",
+        plant: "alter table public.accounts alter column color set default pg_sleep(30)::text || '#1f6f5c'",
+        object: /^"COLUMN public\.accounts\.color"$/,
+      },
+      {
+        name: "a check constraint calling a function",
+        plant: "alter table public.settings add constraint settings_peek check (current_setting('is_superuser') <> '')",
+        object: /^"CONSTRAINT public\.settings\.settings_peek"$/,
+      },
+      {
+        name: "an expression index",
+        plant: "create index settings_peek on public.settings (md5(key))",
+        object: /^"(RELATION|INDEX) public\.settings_peek"$/,
+      },
+      {
+        name: "an index changed to a partial one",
+        plant:
+          "drop index public.pending_transactions_account_idx; " +
+          "create index pending_transactions_account_idx on public.pending_transactions (account_id) where md5(id::text) <> ''",
+        object: /^"INDEX public\.pending_transactions_account_idx"$/,
+      },
+      {
+        name: "a generated column",
+        plant: "alter table public.settings add column peek text generated always as (md5(key)) stored",
+        object: /^"COLUMN public\.settings\.peek"$/,
+      },
+      {
+        name: "an extra column",
+        plant: "alter table public.settings add column extra text",
+        object: /^"COLUMN public\.settings\.extra"$/,
+      },
+      { name: "an extra table", plant: "create table public.notes (id int)", object: /^"(RELATION|COLUMN) public\.notes(\.id)?"$/ },
+      {
+        name: "a changed type",
+        plant: "alter table public.settings alter column ciphertext type varchar(10000)",
+        object: /^"COLUMN public\.settings\.ciphertext"$/,
+      },
+      {
+        name: "a missing constraint",
+        plant: "alter table public.settings drop constraint settings_pkey",
+        object: /^"(RELATION|INDEX|CONSTRAINT) public\.(settings\.)?settings_pkey"$/,
+      },
+    ])("refuses $name, and leaves the live database alone", async ({ plant, object }) => {
+      const crafted = await craftedArchive(plant);
+      const debug = vi.spyOn(console, "debug").mockImplementation(() => undefined);
+      try {
+        await expect(restoreDatabase({ liveUrl: LIVE, ...crafted, currentKey: currentKey() })).rejects.toMatchObject({
+          text: { key: "backup.errors.unsafeDump" },
+        });
+        const [line] = debug.mock.calls.map((call) => String(call[0]));
+        expect(line?.slice(line.indexOf(": ") + 2)).toMatch(object);
+      } finally {
+        debug.mockRestore();
+        await rm(crafted.file, { force: true });
+      }
+      await expectNothingLeft();
+    });
+
+    it("refuses a dump whose own migrations are not the ones the manifest names", async () => {
+      // 0006_roles_data changes no schema, so only the migrations table tells the two levels apart.
+      const crafted = await craftedArchive("", 7);
+      try {
+        const applied = crafted.manifest.migrations.applied.slice(0, -1);
+        const manifest = { ...crafted.manifest, migrations: { ...crafted.manifest.migrations, applied, count: applied.length } };
+        await expect(restoreDatabase({ liveUrl: LIVE, ...crafted, manifest, currentKey: currentKey() })).rejects.toMatchObject({
+          text: { key: "backup.errors.unsafeDump", vars: { entry: "TABLE DATA drizzle __drizzle_migrations" } },
+        });
+      } finally {
+        await rm(crafted.file, { force: true });
+      }
+      await expectNothingLeft();
+    });
+
+    it("compares an older archive at its own level, then migrates it", async () => {
+      const level = knownMigrations().length - 2;
+      const older = await craftedArchive("", level);
+      try {
+        expect(older.manifest.migrations.count).toBe(level);
+        await restoreDatabase({ liveUrl: LIVE, ...older, currentKey: currentKey() });
+      } finally {
+        await rm(older.file, { force: true });
+      }
+      const restored = postgres(LIVE, { max: 1, onnotice: () => {} });
+      const reference = postgres(BASE, { max: 1, onnotice: () => {} });
+      try {
+        const applied = await restored<{ hash: string }[]>`select hash from drizzle.__drizzle_migrations order by created_at`;
+        expect(applied.map((row) => row.hash)).toEqual(knownMigrations().map((entry) => entry.hash));
+        await matchReference(restored, reference);
+      } finally {
+        await restored.end();
+        await reference.end();
+      }
+      expect(await databases(LIVE_NAME)).toEqual([LIVE_NAME, `${LIVE_NAME}_previous`]);
+    });
   });
 
   describe("over the network, against rclone's own servers on loopback", () => {
