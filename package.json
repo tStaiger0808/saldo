@@ -1,0 +1,32 @@
+{
+  "name": "saldo",
+  "license": "AGPL-3.0-or-later",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --cwd apps/web dev",
+    "build": "bun run --cwd apps/web build",
+    "typecheck": "bun run --workspaces typecheck",
+    "lint": "bun --bun biome check --error-on-warnings",
+    "format": "bun --bun biome format --write",
+    "test": "bun --bun vitest run",
+    "db:generate": "bun run --cwd apps/web db:generate",
+    "db:migrate": "bun run --cwd apps/web db:migrate",
+    "e2e": "bun run --cwd apps/web e2e"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "@types/node": "^26.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "trustedDependencies": [
+    "esbuild"
+  ]
+}

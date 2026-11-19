@@ -1,0 +1,100 @@
+services:
+  db:
+    image: docker.io/library/postgres:17-alpine@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: saldo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD missing in .env}
+      POSTGRES_DB: saldo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Ceilings so that one runaway request or query cannot take the whole host down with it.
+    mem_limit: 1g
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saldo -d saldo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Containerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://saldo:${POSTGRES_PASSWORD}@db:5432/saldo
+      # PORT in .env is the host port; inside the container the app always listens on 3000.
+      PORT: "3000"
+      BACKUP_DIR: /backups
+    # Settings → Sicherung writes the "local folder" target and the safety copy before a restore into ./backups,
+    # as the installing user like the backup service below (BACKUP_UID/BACKUP_GID, filled in by install.sh).
+    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8000}:3000"
+    # Lets the app reach services on the host such as a local Ollama (built in on Docker Desktop, needed on Linux).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  # Only with `docker compose --profile local-https up -d`: HTTPS on https://localhost:8443 for local testing.
+  https:
+    image: docker.io/library/caddy:2-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
+    profiles: ["local-https"]
+    restart: unless-stopped
+    depends_on: [app]
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./deploy/Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    mem_limit: 256m
+    pids_limit: 64
+
+  # Nightly plain pg_dump into ./backups, unencrypted; kept for existing installs. Encrypted, off-site backups with
+  # retention are set up in the app (Settings → Sicherung); once they run you may stop this service (README).
+  backup:
+    image: docker.io/library/postgres:17-alpine@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac
+    restart: unless-stopped
+    # Dumps hold every booking in plain text: written as the installing user, readable only by them.
+    user: "${BACKUP_UID:-0}:${BACKUP_GID:-0}"
+    environment:
+      PGHOST: db
+      PGUSER: saldo
+      PGDATABASE: saldo
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-30}
+    volumes:
+      - ./backups:/backups
+    mem_limit: 512m
+    pids_limit: 64
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        umask 077
+        while true; do
+          pg_dump --format=custom --exclude-table-data=session --exclude-table-data=verification \
+            --file="/backups/saldo-$$(date +%Y-%m-%d).dump" \
+            && find /backups -name 'saldo-*.dump' -mtime +$$BACKUP_KEEP_DAYS -delete
+          sleep 86400
+        done
+
+volumes:
+  pgdata:
+  caddy-data:

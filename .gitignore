@@ -1,0 +1,36 @@
+.env
+backups/
+.DS_Store
+# Secrets and credentials: never commit these (API keys, bank logins, tokens, certificates)
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.secrets/
+credentials*.json
+*.secret
+
+# Databases, dumps and backups hold personal financial data
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+
+# Build output, dependencies, caches
+node_modules/
+.output/
+.nitro/
+.tanstack/
+dist/
+test-results/
+playwright-report/
+*.log
+
+# Editors and OS
+.idea/
+.vscode/
+.claude/

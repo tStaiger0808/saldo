@@ -1,0 +1,13 @@
+# Local HTTPS for testing on your own machine (Enable Banking only accepts https:// return addresses).
+# Caddy issues the certificate from its own local CA; the browser warns until you trust that CA.
+# Set TRUSTED_PROXY=on in .env: Caddy replaces X-Forwarded-For with the address that connected to it.
+{
+	auto_https disable_redirects
+}
+
+https://localhost:8443, https://127.0.0.1:8443 {
+	tls internal
+	reverse_proxy app:3000 {
+		header_up X-Forwarded-For {remote_host}
+	}
+}

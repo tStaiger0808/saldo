@@ -1,0 +1,19 @@
+{
+  "name": "@saldo/banking",
+  "license": "AGPL-3.0-or-later",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/fake-trade-republic.ts"
+  },
+  "scripts": {
+    "typecheck": "bun --bun tsc -p ."
+  },
+  "dependencies": {
+    "@saldo/core": "workspace:*",
+    "lib-fints": "^1.5.3",
+    "zod": "^4.6.7"
+  }
+}

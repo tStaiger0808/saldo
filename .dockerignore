@@ -1,0 +1,14 @@
+**/node_modules
+**/.output
+**/.nitro
+**/.tanstack
+**/.env
+**/.env.*
+!.env.example
+**/*.pem
+**/*.key
+backups
+.git
+.claude
+**/test-results
+**/playwright-report

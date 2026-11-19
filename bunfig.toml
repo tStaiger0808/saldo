@@ -1,0 +1,3 @@
+[install]
+# Each package sees only its own dependencies.
+linker = "isolated"

@@ -1,0 +1,182 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, type Page, test } from "@playwright/test";
+
+const ADMIN = { username: "admin", password: "e2e-password-123" };
+const ACCOUNT = "DKB Girokonto";
+
+test.describe.configure({ mode: "serial" });
+
+async function login(page: Page) {
+  await page.goto("/login");
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("Benutzername").fill(ADMIN.username);
+  await page.getByLabel("Passwort").fill(ADMIN.password);
+  await page.getByRole("button", { name: "Anmelden" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Übersicht" })).toBeVisible();
+}
+
+async function expectNoAxeViolations(page: Page, label: string) {
+  const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  const summary = result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
+  expect(summary, `axe auf ${label}`).toEqual([]);
+}
+
+async function setMode(page: Page, mode: "hell" | "dunkel") {
+  await page.goto("/persoenlich/darstellung");
+  await page.getByLabel("Farbe").selectOption("tanne");
+  await page.getByLabel("Modus").selectOption(mode);
+}
+
+async function expectNoHorizontalScroll(page: Page) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
+let page: Page;
+
+test.beforeAll(async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: "reduce", locale: "de-DE" });
+  page = await context.newPage();
+  await login(page);
+});
+
+test.afterAll(async () => {
+  await page.context().close();
+});
+
+test("the accounts overview lists the accounts by group, bank and kind", async () => {
+  const nav = page.getByRole("navigation", { name: "Hauptnavigation" });
+  await nav.getByRole("link", { name: "Konten", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Konten" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Gesamtsaldo" })).toContainText("5 Konten");
+  const mine = page.getByRole("region", { name: "Meine Konten" });
+  await expect(mine.locator("a.account-row")).toHaveCount(4);
+  await expect(mine.getByRole("link", { name: new RegExp(ACCOUNT) })).toContainText("IBAN endet auf 2051");
+
+  const grouping = page.getByRole("group", { name: "Gruppieren nach" });
+  await grouping.getByRole("button", { name: "Art" }).click();
+  await expect(page).toHaveURL(/nach=art/);
+  await expect(grouping.getByRole("button", { name: "Art" })).toHaveAttribute("aria-pressed", "true");
+  const checking = page.getByRole("region", { name: "Girokonten" });
+  await expect(checking.locator("a.account-row")).toHaveCount(2);
+  await expect(page.getByRole("region", { name: "Kreditkarten" })).toContainText("−");
+
+  const toggle = checking.getByRole("button", { name: "2 Konten" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(checking.getByRole("link")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Girokonten" }).getByRole("button", { name: "2 Konten" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await page.getByRole("region", { name: "Girokonten" }).getByRole("button", { name: "2 Konten" }).click();
+});
+
+test("an account opens its detail page with balance, chart and the bookings table with totals", async () => {
+  await page.goto("/konten");
+  await page.getByRole("link", { name: new RegExp(ACCOUNT) }).click();
+  await expect(page.getByRole("heading", { level: 1, name: ACCOUNT })).toBeVisible();
+  await expect(page.getByText("DE02 1203 0000 0000 2020 51")).toBeVisible();
+  const history = page.getByRole("region", { name: "Saldoverlauf" });
+  await expect(history.getByRole("slider")).toBeVisible();
+  await expect(history.getByRole("button", { name: "Tabelle" })).toHaveCount(0);
+
+  const bookings = page.getByRole("region", { name: "Buchungen", exact: true });
+  // With new bookings the row link opens them only (?neu=true); this test wants all of them.
+  await bookings.getByRole("group", { name: "Schnellfilter" }).getByRole("button", { name: /^Alle/ }).click();
+  await expect(page).not.toHaveURL(/neu=true/);
+  await expect(bookings.getByRole("columnheader")).toHaveText([/^Datum/, "Gegenpartei · Verwendungszweck", /^Betrag/, "Kategorie"]);
+  const totals = bookings.getByRole("region", { name: "Summen aller gefilterten Buchungen" });
+  await expect(totals).toContainText(/Anzahl\s*\d+/);
+  await expect(bookings.getByText(/^50 von \d+ Buchungen$/)).toBeVisible();
+  await bookings.getByRole("button", { name: "Mehr laden" }).click();
+  await expect(bookings.getByRole("status")).toHaveText("50 weitere Buchungen geladen");
+  await expect(bookings.getByText(/^50 von/)).toHaveCount(0);
+
+  await bookings.getByLabel("Suche", { exact: true }).fill("haushalt");
+  await bookings.getByRole("button", { name: "Suchen" }).click();
+  await expect(page).toHaveURL(/q=haushalt/);
+  await expect(bookings.getByRole("button", { name: /Spotify/ })).toHaveCount(0);
+  await expect(bookings.getByRole("row").filter({ hasText: "Beitrag Haushalt" }).first()).toContainText("Umbuchung");
+  await expect(totals).toContainText("nicht eingerechnet");
+  await bookings.getByLabel("Suche", { exact: true }).fill("SPOTIFY");
+  await bookings.getByRole("button", { name: "Suchen" }).click();
+  await bookings
+    .getByRole("button", { name: /Spotify AB/ })
+    .first()
+    .click();
+  const drawer = page.getByRole("dialog", { name: "Buchung bearbeiten" });
+  await expect(drawer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+
+  await expect(page.getByRole("link", { name: "In Buchungen öffnen" })).toHaveAttribute("href", /\/buchungen\?konto=\d+/);
+});
+
+test("an unknown account is a 404", async () => {
+  await page.goto("/konten/999999");
+  await expect(page.getByRole("heading", { level: 1, name: "Seite nicht gefunden" })).toBeVisible();
+});
+
+test("scrolling condenses the page head to one line and back", async () => {
+  await page.goto("/konten");
+  await page.getByRole("link", { name: new RegExp(ACCOUNT) }).click();
+  const head = page.locator(".page-head");
+  await expect(head).not.toHaveAttribute("data-condensed");
+  // The page must be fully laid out before scrolling: a short page never condenses.
+  await expect(page.getByRole("region", { name: "Buchungen", exact: true }).locator("tbody tr").first()).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  const tall = await head.evaluate((e) => e.getBoundingClientRect().height);
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await expect(head).toHaveAttribute("data-condensed", "");
+  await expect(page.getByRole("heading", { level: 1, name: ACCOUNT })).toBeVisible();
+  await expect(head.getByRole("link", { name: /Alle Konten/ })).toBeVisible();
+  expect(await head.evaluate((e) => e.getBoundingClientRect().height)).toBeLessThan(tall);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(head).not.toHaveAttribute("data-condensed");
+});
+
+test("the accounts pages are keyboard reachable", async () => {
+  await page.goto("/konten");
+  await page.locator("main").focus();
+  let reached = false;
+  for (let i = 0; i < 30 && !reached; i++) {
+    await page.keyboard.press("Tab");
+    reached = await page.evaluate(() => document.activeElement?.classList.contains("account-row") ?? false);
+  }
+  expect(reached).toBe(true);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 1 })).not.toHaveText("Konten");
+  const booking = page.locator(".booking-open").first();
+  await booking.focus();
+  await expect(booking).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Buchung bearbeiten" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(booking).toBeFocused();
+});
+
+test("the accounts pages pass axe in light and dark mode and fit a phone screen", async () => {
+  await page.goto("/konten");
+  const detail = (await page.getByRole("link", { name: new RegExp(ACCOUNT) }).getAttribute("href")) ?? "";
+  for (const mode of ["hell", "dunkel"] as const) {
+    await setMode(page, mode);
+    for (const path of ["/konten", "/konten?nach=bank", detail]) {
+      await page.goto(path);
+      await page.waitForLoadState("networkidle");
+      await expect(page.locator("h1")).toBeVisible();
+      await expectNoAxeViolations(page, `${path} (${mode})`);
+    }
+  }
+  await setMode(page, "hell");
+  await page.setViewportSize({ width: 375, height: 740 });
+  for (const path of ["/konten", detail]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    await expectNoHorizontalScroll(page);
+  }
+  await page.mouse.wheel(0, 1200);
+  await expect(page.getByRole("region", { name: "Summen aller gefilterten Buchungen" })).toBeInViewport();
+});
