@@ -6247,6 +6247,10 @@ dialog.drawer[open]::backdrop {
 :is(.card-head, .accounts-total-head):has(> .fold-toggle:hover) > .fold-toggle {
   background: var(--hover);
 }
+/* A pressed button's transform would shrink the stretched hit area, so the release would miss and drop the click. */
+:is(.card-head, .accounts-total-head) > .fold-toggle.btn:active {
+  transform: none;
+}
 .fold-toggle[aria-expanded] > .icon {
   transition: transform var(--fade);
 }

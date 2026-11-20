@@ -157,9 +157,9 @@ test("the balance chart folds on the overview and on account pages, each remembe
   await expect(total.locator(".accounts-total-value")).toBeVisible();
   await page.reload();
   await expectChartFolded(total);
-  await total.getByRole("heading", { name: "Gesamtsaldo" }).click({ force: true });
+  await total.getByRole("heading", { name: "Gesamtsaldo" }).click({ force: true, delay: 200 });
   await expect(total.getByRole("button", { name: "Saldoverlauf einklappen" })).toHaveAttribute("aria-expanded", "true");
-  await total.getByRole("heading", { name: "Gesamtsaldo" }).click({ force: true });
+  await total.getByRole("heading", { name: "Gesamtsaldo" }).click({ force: true, delay: 200 });
   await expectChartFolded(total);
   await beforeHydration("/konten", async (preview) => {
     await expect(preview.locator(".accounts-total .timeline-period")).toBeVisible();
@@ -171,6 +171,10 @@ test("the balance chart folds on the overview and on account pages, each remembe
   await expect(history.getByRole("button", { name: "Saldoverlauf einklappen" })).toBeVisible();
   await foldChart(history);
   await page.reload();
+  await expectChartFolded(history);
+  await history.getByRole("heading", { name: "Saldoverlauf" }).click({ force: true, delay: 200 });
+  await expect(history.getByRole("button", { name: "Saldoverlauf einklappen" })).toHaveAttribute("aria-expanded", "true");
+  await history.getByRole("heading", { name: "Saldoverlauf" }).click({ force: true, delay: 200 });
   await expectChartFolded(history);
   const detail = page.url();
   await beforeHydration(detail, async (preview) => {
@@ -212,6 +216,22 @@ test("the balance chart folds on the overview and on account pages, each remembe
   await unfoldChart(total);
   await page.reload();
   await expect(total.getByRole("button", { name: "Saldoverlauf einklappen" })).toHaveAttribute("aria-expanded", "true");
+});
+
+test("with motion on, a held click on a section title still folds it", async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: "no-preference", locale: "de-DE" });
+  const moving = await context.newPage();
+  await login(moving);
+  await moving.goto("/konten");
+  await moving.waitForLoadState("networkidle");
+  const total = moving.getByRole("region", { name: "Gesamtsaldo" });
+  const toggle = total.locator(".fold-toggle");
+  const before = await toggle.getAttribute("aria-expanded");
+  await total.getByRole("heading", { name: "Gesamtsaldo" }).click({ force: true, delay: 250 });
+  await expect(toggle).not.toHaveAttribute("aria-expanded", before ?? "");
+  await total.getByRole("heading", { name: "Gesamtsaldo" }).click({ force: true, delay: 250 });
+  await expect(toggle).toHaveAttribute("aria-expanded", before ?? "");
+  await context.close();
 });
 
 test("an account opens its detail page with balance, chart and the bookings table with totals", async () => {
