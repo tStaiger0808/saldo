@@ -87,7 +87,7 @@ export function AccountBadge({
   );
 }
 
-/** "1 neu" in the account's sub line; the row itself then opens the new bookings. */
+/** "1 neu" in the account's sub line; the row opens all bookings with the new ones marked on top. */
 export function UnreadBadge({ count }: { count: number }) {
   const { t } = useI18n();
   if (count === 0) return null;

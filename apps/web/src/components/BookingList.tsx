@@ -4,7 +4,7 @@ import type { BookingSort, QuickFilter } from "../lib/booking-filter.ts";
 import type { LoadTrigger } from "../lib/booking-run.ts";
 import { type DateWindow, inWindow } from "../lib/booking-window.ts";
 import type { PendingBooking } from "../server/modules/transactions/index.ts";
-import { Amount, CategoryOrigin, NewMark, TableWrap, TransferBadge } from "./Bits.tsx";
+import { Amount, NewMark, TableWrap, TransferBadge } from "./Bits.tsx";
 import { Icon } from "./Icon.tsx";
 import type { TransactionItem } from "./TransactionDrawer.tsx";
 
@@ -83,7 +83,6 @@ function CategoryCell({ txn, categories, tags }: { txn: TransactionItem; categor
         <span className="booking-category-name">
           <span className="swatch" style={{ background: category.color }} aria-hidden="true" />
           {category.name}
-          <CategoryOrigin source={txn.categorySource} />
         </span>
       ) : txn.transferKind ? null : (
         <span className="booking-uncategorized">{t("transactions.uncategorized")}</span>
