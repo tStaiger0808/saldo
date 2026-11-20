@@ -428,13 +428,7 @@ function AccountRow({ account: a, grouping, onLongPress }: { account: AccountSum
     onLongPress();
   });
   return (
-    <Link
-      to="/konten/$accountId"
-      params={{ accountId: String(a.id) }}
-      search={a.unreadCount > 0 ? { neu: true } : undefined}
-      className="account-row"
-      {...press}
-    >
+    <Link to="/konten/$accountId" params={{ accountId: String(a.id) }} className="account-row" {...press}>
       <AccountBadge account={a} />
       <span className="account-main">
         <span className="account-name">{a.name}</span>

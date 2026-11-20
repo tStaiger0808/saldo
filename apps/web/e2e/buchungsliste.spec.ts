@@ -218,7 +218,7 @@ test("the account page uses the same table, quick filters and totals", async () 
   await page.goto("/konten");
   await page.getByRole("link", { name: new RegExp(`^${ACCOUNT}`) }).click();
   const bookings = page.getByRole("region", { name: "Buchungen", exact: true });
-  // With new bookings the row link opens them only (?neu=true); this test wants all of them.
+  // The row link opens all bookings; the quick filter "Alle" is the default.
   const all = bookings.getByRole("group", { name: "Schnellfilter" }).getByRole("button", { name: /^Alle/ });
   await all.click();
   await expect(page).not.toHaveURL(/neu=true/);

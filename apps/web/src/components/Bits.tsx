@@ -35,17 +35,6 @@ export function TransferBadge({ kind, label }: { kind: "internal" | "external" |
 }
 
 /** Who set a booking's category: the person, the AI or a rule; the visible word is short, the read text says what it is. */
-export function CategoryOrigin({ source }: { source: "manual" | "ai" | "rule" | null }) {
-  const t = useT();
-  if (!source) return null;
-  return (
-    <span className="muted small">
-      <span className="visually-hidden">{t("transactions.categoryOrigin")} </span>
-      {t(`labels.categorySource.${source}`)}
-    </span>
-  );
-}
-
 export function NewMark() {
   const t = useT();
   return <span className="new-mark">{t("common.newMark")}</span>;

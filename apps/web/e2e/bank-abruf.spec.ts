@@ -167,16 +167,21 @@ test("Alt+Shift+R and the top bar button fetch from any page; both and 'Konten' 
   await page.goto("/konten");
 });
 
-test("the 'new' badge of an account opens its new bookings", async () => {
+test("an account with new bookings opens all its bookings, the new one on top and marked", async () => {
   const link = row(CARD).getByRole("link", { name: /1 neue Buchung/ });
   await expect(link.locator('.unread-badge [aria-hidden="true"]')).toHaveText("1 neu");
   await link.click();
   await expect(page.getByRole("heading", { level: 1, name: CARD })).toBeVisible();
-  await expect(page).toHaveURL(/neu=true/);
-  await expect(page.getByRole("button", { name: /^Neu/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page).not.toHaveURL(/neu=true/);
   const bookings = page.getByRole("region", { name: "Buchungen", exact: true });
-  await expect(bookings.getByRole("button", { name: "Kantine Süd" })).toBeVisible();
-  await expect(bookings.getByRole("button", { name: "Bäckerei" })).toHaveCount(0);
+  await expect(bookings.getByRole("group", { name: "Schnellfilter" }).getByRole("button", { name: /^Alle/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const first = bookings.locator("tbody tr.booking-row").first();
+  await expect(first).toHaveAttribute("data-unread", "true");
+  await expect(first.getByRole("button", { name: "Kantine Süd" })).toBeVisible();
+  await expect(bookings.getByRole("button", { name: "Bäckerei" })).toBeVisible();
 });
 
 test("a bank asking for a code still opens the job dialog", async () => {
