@@ -481,6 +481,11 @@ test("a consent without accounts explains the control panel step and offers rene
   const unfold = pending.getByRole("button", { name: "Angefangene Bankverbindungen ausklappen" });
   await expect(unfold).toHaveAttribute("aria-expanded", "false");
   await expect(row).toBeHidden();
+  await pending.getByRole("heading", { name: "Angefangene Bankverbindungen" }).click({ force: true });
+  await expect(row).toBeVisible();
+  await pending.getByRole("heading", { name: "Angefangene Bankverbindungen" }).click({ force: true });
+  await expect(unfold).toHaveAttribute("aria-expanded", "false");
+  await expect(row).toBeHidden();
   await page.reload();
   await expect(unfold).toHaveAttribute("aria-expanded", "false");
   await expect(row).toBeHidden();

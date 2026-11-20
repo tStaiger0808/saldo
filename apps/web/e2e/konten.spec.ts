@@ -90,6 +90,16 @@ test("a click anywhere on a group header folds the group, while its total and �
   await head.click({ position: { x: 6, y: 6 } });
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
 
+  const right = async (locator: ReturnType<Page["locator"]>) => {
+    const b = (await locator.boundingBox()) ?? { x: 0, width: 0 };
+    return Math.round(b.x + b.width);
+  };
+  const firstRow = mine.locator(".account-item").first();
+  expect(await right(firstRow.getByRole("button", { name: /^Aktionen für / }))).toBe(
+    await right(head.getByRole("button", { name: "Aktionen für Meine Konten" })),
+  );
+  expect(await right(firstRow.locator(".account-row .amount").first())).toBe(await right(head.locator(".account-section-total .amount")));
+
   await head.locator(".account-section-total").click();
   await head.getByRole("button", { name: "Aktionen für Meine Konten" }).click();
   await expect(page.getByRole("menuitem", { name: "Gruppen verwalten" })).toBeVisible();
@@ -146,6 +156,10 @@ test("the balance chart folds on the overview and on account pages, each remembe
   await expect(total).toContainText("5 Konten");
   await expect(total.locator(".accounts-total-value")).toBeVisible();
   await page.reload();
+  await expectChartFolded(total);
+  await total.getByRole("heading", { name: "Gesamtsaldo" }).click({ force: true });
+  await expect(total.getByRole("button", { name: "Saldoverlauf einklappen" })).toHaveAttribute("aria-expanded", "true");
+  await total.getByRole("heading", { name: "Gesamtsaldo" }).click({ force: true });
   await expectChartFolded(total);
   await beforeHydration("/konten", async (preview) => {
     await expect(preview.locator(".accounts-total .timeline-period")).toBeVisible();
