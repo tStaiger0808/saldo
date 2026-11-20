@@ -23,11 +23,11 @@ export function migrationsFolder(): string {
 // Any fixed number; keeps two starting containers from migrating at the same time.
 const LOCK_ID = 727_001;
 
-export async function runMigrations(url: string): Promise<void> {
+export async function runMigrations(url: string, folder: string = migrationsFolder()): Promise<void> {
   const client = postgres(url, { max: 1, onnotice: () => {} });
   try {
     await client`select pg_advisory_lock(${LOCK_ID})`;
-    await migrate(drizzle(client), { migrationsFolder: migrationsFolder() });
+    await migrate(drizzle(client), { migrationsFolder: folder });
   } finally {
     await client`select pg_advisory_unlock(${LOCK_ID})`.catch(() => {});
     await client.end({ timeout: 5 });

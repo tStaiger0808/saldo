@@ -2,12 +2,13 @@
  * The database side of backups. A dump runs inside one exported snapshot, so its row counts and migrations describe
  * exactly the dumped state. A restore only ever writes to a fresh database; the live one is replaced at the very end by
  * renaming both in one transaction, and kept as `<name>_previous` until the next restore. The dump itself is untrusted
- * (guard.ts): only allowed entries are restored, by a throwaway role without superuser rights, and the result is audited.
+ * (guard.ts): only allowed entries are restored, by a throwaway role without superuser rights, and the result is audited
+ * and compared with a second throwaway database built from this build's migrations at the archive's level.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { once } from "node:events";
 import { createReadStream } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -20,7 +21,7 @@ import { migrationsFolder, runMigrations } from "../../db/migrate.ts";
 import { UserError } from "../../errors.ts";
 import { type Manifest, openArchive } from "./archive.ts";
 import type { Keys } from "./container.ts";
-import { auditRestored, restorableList } from "./guard.ts";
+import { auditRestored, matchReference, restorableList } from "./guard.ts";
 import { pgEnv, runTool } from "./tools.ts";
 
 /** Sessions and sign-in tokens stay behind, so everyone signs in again after a restore; impersonations belong to sessions. */
@@ -79,18 +80,31 @@ export const migrationsHash = (entries: MigrationEntry[]) =>
 export type Compatibility = { ok: true; pending: number } | { ok: false; reason: "newer" | "unknown" };
 
 /**
- * Whether this build can take a database with these migrations applied: every one must be known here (Drizzle tells
- * them apart by their timestamp, as below). Older archives are migrated after the restore; newer ones are refused.
+ * Whether this build can take a database with these migrations applied: they must be the first of this build's
+ * migrations, in order, with the same timestamps and hashes. Older archives are migrated after the restore; archives
+ * that go on past this build's last migration are newer and refused, as is anything else.
  */
 export function compatibility(applied: MigrationEntry[], known: MigrationEntry[] = knownMigrations()): Compatibility {
-  const knownTimes = new Set(known.map((entry) => entry.createdAt));
   const latestKnown = Math.max(0, ...known.map((entry) => entry.createdAt));
-  for (const entry of applied) {
-    if (knownTimes.has(entry.createdAt)) continue;
-    return { ok: false, reason: entry.createdAt > latestKnown ? "newer" : "unknown" };
+  for (const [index, entry] of applied.entries()) {
+    const ours = known[index];
+    if (ours?.createdAt === entry.createdAt && ours.hash === entry.hash) continue;
+    return { ok: false, reason: !ours && entry.createdAt > latestKnown ? "newer" : "unknown" };
   }
-  const latestApplied = Math.max(0, ...applied.map((entry) => entry.createdAt));
-  return { ok: true, pending: known.filter((entry) => entry.createdAt > latestApplied).length };
+  return { ok: true, pending: known.length - applied.length };
+}
+
+/** Applies this build's first `count` migrations, from a copy of the migrations folder that ends there. */
+export async function migrateTo(url: string, count: number, scratch: string): Promise<void> {
+  const folder = migrationsFolder();
+  const journal = JSON.parse(await readFile(join(folder, "meta", "_journal.json"), "utf8")) as { entries: { tag: string }[] };
+  if (count === journal.entries.length) return runMigrations(url, folder);
+  const partial = join(scratch, "migrations");
+  await mkdir(join(partial, "meta"), { recursive: true });
+  const entries = journal.entries.slice(0, count);
+  await writeFile(join(partial, "meta", "_journal.json"), JSON.stringify({ ...journal, entries }));
+  for (const { tag } of entries) await copyFile(join(folder, `${tag}.sql`), join(partial, `${tag}.sql`));
+  await runMigrations(url, partial);
 }
 
 export type DumpFacts = { counts: Record<string, number>; migrations: MigrationEntry[]; serverVersion: string };
@@ -198,8 +212,9 @@ export type RestoreInput = {
 };
 
 /**
- * Restores the archive into a fresh database, checks its row counts against the manifest, migrates and re-keys it,
- * and only then swaps it in. Any failure before the swap leaves the live database as it was and drops the new one.
+ * Restores the archive into a fresh database, audits it, compares its schema with a reference database migrated to
+ * the archive's level, checks its row counts against the manifest, migrates and re-keys it, and only then swaps it in.
+ * Any failure before the swap leaves the live database as it was; the new and the reference database are dropped.
  */
 export async function restoreDatabase(input: RestoreInput): Promise<{ database: string; previous: string }> {
   const live = databaseName(input.liveUrl);
@@ -208,11 +223,16 @@ export async function restoreDatabase(input: RestoreInput): Promise<{ database: 
   const temp = `${base}_restore_${suffix}`;
   const previous = `${base}_previous`;
   const tempUrl = withDatabase(input.liveUrl, temp);
+  const reference = `${base}_reference_${suffix}`;
+  const referenceUrl = withDatabase(input.liveUrl, reference);
   const admin = connect(withDatabase(input.liveUrl, "postgres"));
   const scratch = await mkdtemp(join(tmpdir(), "saldo-restore-"));
   let created = false;
   let role: string | null = null;
+  let referenceBuilt: Promise<void> | null = null;
   try {
+    const level = compatibility(input.manifest.migrations.applied);
+    if (!level.ok) throw new UserError(msg(level.reason === "newer" ? "backup.errors.newerSchema" : "backup.errors.unknownSchema"));
     let list = "";
     await openArchive(
       createReadStream(input.file),
@@ -246,6 +266,10 @@ export async function restoreDatabase(input: RestoreInput): Promise<{ database: 
         : "";
     await admin.unsafe(`create database ${ident(temp)} template template0${locale}${role ? ` owner ${ident(role)}` : ""}`);
     created = true;
+    referenceBuilt = admin
+      .unsafe(`create database ${ident(reference)} template template0${locale}`)
+      .then(() => migrateTo(referenceUrl, input.manifest.migrations.applied.length, scratch));
+    referenceBuilt.catch(() => undefined);
 
     input.onStep?.("restore");
     const restoreEnv = role ? { ...pgEnv(input.liveUrl, temp), PGUSER: role, PGPASSWORD: password } : pgEnv(input.liveUrl, temp);
@@ -273,6 +297,16 @@ export async function restoreDatabase(input: RestoreInput): Promise<{ database: 
     const restored = connect(tempUrl);
     try {
       await auditRestored(restored);
+      await referenceBuilt;
+      const expected = connect(referenceUrl);
+      try {
+        await matchReference(restored, expected);
+      } finally {
+        await expected.end({ timeout: 5 });
+      }
+      if (migrationsHash(await appliedMigrations(restored)) !== migrationsHash(input.manifest.migrations.applied)) {
+        throw new UserError(msg("backup.errors.unsafeDump", { entry: "TABLE DATA drizzle __drizzle_migrations" }));
+      }
       const counts = await tableCounts(restored);
       const excluded = new Set<string>(EXCLUDED_DATA);
       for (const [table, expected] of Object.entries(input.manifest.counts)) {
@@ -302,6 +336,10 @@ export async function restoreDatabase(input: RestoreInput): Promise<{ database: 
     created = false;
     return { database: live, previous };
   } finally {
+    if (referenceBuilt) {
+      await referenceBuilt.catch(() => undefined);
+      await admin.unsafe(`drop database if exists ${ident(reference)} with (force)`).catch(() => undefined);
+    }
     if (created) await admin.unsafe(`drop database if exists ${ident(temp)} with (force)`).catch(() => undefined);
     if (role) await admin.unsafe(`drop role if exists ${ident(role)}`).catch(() => undefined);
     await admin.end({ timeout: 5 });

@@ -255,15 +255,19 @@ Datum und Inhalt → „Wiederherstellen …“ → zur Bestätigung `WIEDERHERS
    Constraints in den Schemas `public` und `drizzle` (Liste aus `pg_restore --list`, jeder andere Eintrag wie
    Funktionen, Trigger, Erweiterungen oder fremde Schemas lehnt das Archiv ab), ohne Kommentare und Rechte, und zwar von
    einer eigens angelegten Rolle ohne Superuser-Rechte, der nur die neue Datenbank gehört. Danach prüft Saldo die neue
-   Datenbank auf Funktionen, Trigger, Regeln, Sichten, Richtlinien, Datenbankeinstellungen und Ähnliches, übernimmt den
-   Besitz und löscht die Rolle wieder.
-3. Migrationen ausführen (Archive älterer Versionen werden aktualisiert; Archive einer **neueren** Version lehnt Saldo ab).
+   Datenbank auf Funktionen, Trigger, Regeln, Sichten, Richtlinien, Datenbankeinstellungen und Ähnliches und vergleicht
+   ihr Schema mit einer zweiten, kurzlebigen Datenbank, die Saldo aus seinen eigenen Migrationen auf dem Stand des
+   Archivs aufbaut: Jede Tabelle, Spalte (Typ, Pflichtfeld, Identität, berechneter Ausdruck, Standardwert), jeder
+   Constraint, Index und jede Sequenz muss genau übereinstimmen, sonst lehnt Saldo das Archiv ab. Dann übernimmt Saldo
+   den Besitz und löscht die Rolle wieder.
+3. Migrationen ausführen (Archive älterer Versionen werden aktualisiert; Archive einer **neueren** Version und Archive,
+   deren Migrationen nicht die ersten dieser Version sind, lehnt Saldo ab).
 4. Stammt das Archiv von einer Instanz mit anderem `ENCRYPTION_KEY`, werden Bank-PINs, Schlüssel und Passwörter auf den
    Schlüssel dieses Servers umgeschlüsselt (der alte Schlüssel steht verschlüsselt im Archiv).
 5. Beide Datenbanken werden in einer Transaktion umbenannt: die neue wird `saldo`, die bisherige bleibt als
    `saldo_previous` bis zur nächsten Wiederherstellung liegen. Die App verbindet sich neu, alle melden sich neu an.
 
-Schlägt ein Schritt fehl, bleiben die bisherigen Daten unverändert (die neue Datenbank wird verworfen). Der
+Schlägt ein Schritt fehl, bleiben die bisherigen Daten unverändert (die neue und die Vergleichsdatenbank werden verworfen). Der
 Datenbankbenutzer braucht dafür das Recht, Datenbanken anzulegen und umzubenennen (in `compose.yml` ist er Superuser der
 Datenbank; bei einer eigenen PostgreSQL-Instanz `CREATEDB` und Besitzer der Saldo-Datenbank).
 
