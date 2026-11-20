@@ -2035,7 +2035,7 @@ select:focus-visible {
     display: block;
   }
 }
-.period-picker {
+.page-choice {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2890,6 +2890,8 @@ fieldset.field > .segmented {
   flex-direction: column;
   min-width: 200px;
   max-width: min(320px, calc(100vw - 16px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -2926,6 +2928,18 @@ fieldset.field > .segmented {
 }
 .action-menu-item.danger:is(:hover, :focus) {
   background: var(--danger-soft);
+}
+.action-menu-group {
+  display: flex;
+  flex-direction: column;
+}
+.action-menu-label {
+  padding: 8px 12px 4px 36px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: var(--label-case);
+  letter-spacing: var(--label-track);
 }
 .action-menu-separator {
   margin: 4px 0;
@@ -4002,7 +4016,7 @@ fieldset.field > .segmented {
   }
 }
 .nav-link[aria-busy="true"] > .icon,
-.sync-btn[aria-busy="true"] > .icon,
+.page-head [aria-busy="true"] > .icon,
 .list-end [aria-busy="true"] > .icon {
   transform-origin: center;
   animation: spin 1.4s linear infinite;
@@ -4012,7 +4026,7 @@ fieldset.field > .segmented {
     --fade: 0s;
   }
   .nav-link[aria-busy="true"] > .icon,
-  .sync-btn[aria-busy="true"] > .icon,
+  .page-head [aria-busy="true"] > .icon,
   .list-end [aria-busy="true"] > .icon {
     animation: pulse 2.4s ease-in-out infinite;
   }
@@ -4250,27 +4264,6 @@ fieldset.event-row > legend + * {
 }
 [aria-expanded="true"] > .section-count > .icon {
   transform: rotate(90deg);
-}
-@media (max-width: 520px) {
-  .account-section-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "title menu" "title total";
-  }
-  .account-section-head > h2 {
-    grid-area: title;
-  }
-  .section-title {
-    flex-basis: 100%;
-  }
-  .account-section-head > .account-section-total {
-    grid-area: total;
-    align-self: end;
-  }
-  .account-section-head > .action-menu {
-    grid-area: menu;
-    align-self: start;
-  }
 }
 .account-section:has(.section-toggle[aria-expanded="false"]) .account-section-head {
   border-bottom: 0;
@@ -6267,4 +6260,142 @@ dialog.drawer[open]::backdrop {
 :root[data-folded~="konto-verlauf"] [data-fold-toggle="konto-verlauf"] > .icon,
 :root[data-folded~="konten-angefangen"] [data-fold-toggle="konten-angefangen"] > .icon {
   transform: none;
+}
+
+/*
+ * Phones: the page head stays one row (the primary action as an icon, everything else behind one "⋯"), icon buttons in
+ * heads lose their frame but keep a 44px target, group heads keep title and total on one line, and the search field
+ * shares its row with the search and filter buttons.
+ */
+.page-head-compact,
+.page-head-summary {
+  display: none;
+}
+@media (max-width: 560px) {
+  .main {
+    padding-top: 16px;
+    gap: 16px;
+  }
+  .page-head,
+  :root[data-theme|="leinen"] .page-head {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+    padding-block: 12px;
+  }
+  :root .page-head:has(.back-link) {
+    align-items: flex-end;
+  }
+  :root .page-head[data-condensed] {
+    padding-block: 8px;
+  }
+  .page-head > .page-title {
+    flex: 1 1 auto;
+  }
+  .page-head > .actions {
+    display: none;
+  }
+  .page-head-summary {
+    display: inline;
+  }
+  .page-head-compact {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+  }
+  .page-head-compact > .btn-icon {
+    position: relative;
+    width: 36px;
+    min-width: 0;
+    min-height: 36px;
+    margin: 4px;
+  }
+  .page-head-compact > .btn-icon::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+  }
+  .page-head-compact > .action-menu {
+    margin-right: -8px;
+  }
+
+  .filter-toolbar,
+  .filter-toolbar > .actions {
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .filter-toolbar > .field,
+  .filter-top > .filter-toolbar > .field {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .filter-toolbar > .actions > .btn {
+    padding: 0 12px;
+  }
+  .filter-toolbar .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  :root[data-theme|="leinen"] .btn.btn-ghost,
+  :root :is(.page-head-compact, .account-section-head) .action-menu > .btn {
+    border-color: transparent;
+    background: none;
+    box-shadow: none;
+  }
+  :root :is(.page-head-compact, .account-section-head) .action-menu > .btn {
+    color: var(--ink-2);
+  }
+  :root .account-section-head .action-menu > .btn,
+  :is(.card-head, .accounts-total-head) > .fold-toggle {
+    color: var(--muted);
+  }
+  :root :is(.page-head-compact, .account-section-head) .action-menu > .btn:is(:hover, [aria-expanded="true"]) {
+    background: var(--hover);
+    color: var(--ink);
+  }
+  :is(.card-head, .accounts-total-head) > .fold-toggle {
+    margin-block: -6px;
+    margin-right: -12px;
+  }
+
+  .account-section-head {
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 6px 4px 6px 16px;
+  }
+  .account-section-head:not(:has(> .action-menu)) {
+    padding-right: 16px;
+  }
+  .account-section-head > h2 {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .account-section-head .section-toggle {
+    flex-wrap: nowrap;
+    gap: 8px;
+    max-width: 100%;
+    min-height: 44px;
+  }
+  .account-section-head .section-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .account-section-head .section-count {
+    flex: none;
+    white-space: nowrap;
+  }
+  .account-section-head > .account-section-total {
+    flex: none;
+  }
+  .account-section-head > .action-menu {
+    flex: none;
+    margin-left: -4px;
+  }
 }

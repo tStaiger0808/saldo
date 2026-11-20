@@ -1,11 +1,11 @@
 import { createFileRoute, getRouteApi, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { CardEditor } from "../../components/CardEditor.tsx";
 import { CardContent, type Lookup } from "../../components/DashboardCards.tsx";
 import { ConfirmDialog, FormDialog } from "../../components/Dialog.tsx";
 import { Field } from "../../components/Field.tsx";
 import { Icon } from "../../components/Icon.tsx";
-import { PageHead } from "../../components/PageHead.tsx";
+import { type PageChoice, PageHead } from "../../components/PageHead.tsx";
 import { Banner, NoticeBanner } from "../../components/Status.tsx";
 import { translator } from "../../i18n/index.ts";
 import { useI18n, useT } from "../../i18n/react.tsx";
@@ -78,6 +78,7 @@ function OverviewPage() {
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
   const { notice, setNotice, clear } = useNotice();
+  const periodChoice = usePeriodChoice(active?.id ?? null, period, range, setNotice);
   const viewName = (active?.groupId != null && groups.find((g) => g.id === active.groupId)?.name) || t("common.allAccounts");
   const lookup: Lookup = {
     categories: new Map(categories.map((c) => [c.id, c])),
@@ -89,22 +90,13 @@ function OverviewPage() {
       <PageHead
         eyebrow={viewName}
         title={t("shell.overview")}
-        actions={
-          !editing && (
-            <>
-              {active && <PeriodPicker dashboardId={active.id} period={period} range={range} onNotice={setNotice} />}
-              <button type="button" className="btn" onClick={() => setCreating(true)}>
-                <Icon name="plus" size={18} /> {t("dashboard.newDashboard")}
-              </button>
-              {active && (
-                <button type="button" className="btn" onClick={() => setEditing(true)}>
-                  <Icon name="edit" size={18} /> {t("common.edit")}
-                </button>
-              )}
-            </>
-          )
-        }
+        choices={[!editing && periodChoice.choice]}
+        actions={[
+          !editing && { label: t("dashboard.newDashboard"), icon: "plus", onSelect: () => setCreating(true) },
+          !editing && active && { label: t("common.edit"), icon: "edit", onSelect: () => setEditing(true) },
+        ]}
       />
+      {periodChoice.dialog}
       <NoticeBanner notice={notice} onClose={clear} />
       {dashboards.length > 1 && (
         <nav className="tabs" aria-label={t("dashboard.tabsLabel")}>
@@ -157,78 +149,70 @@ function OverviewPage() {
 
 /**
  * The dashboard's period: shown at once through the address, stored for the owner so it is there again next time. While
- * a superuser views as someone else nothing is stored, the period only applies to this view.
+ * a superuser views as someone else nothing is stored, the period only applies to this view. Without a dashboard there
+ * is nothing to choose.
  */
-function PeriodPicker({
-  dashboardId,
-  period,
-  range,
-  onNotice,
-}: {
-  dashboardId: number;
-  period: DashboardPeriod;
-  range: DashboardRange;
-  onNotice: (notice: Notice) => void;
-}) {
+function usePeriodChoice(
+  dashboardId: number | null,
+  period: DashboardPeriod,
+  range: DashboardRange,
+  onNotice: (notice: Notice) => void,
+): { choice: PageChoice | null; dialog: ReactNode } {
   const navigate = useNavigate();
   const { t, f } = useI18n();
   const { user } = appRoute.useRouteContext();
   const save = useAction(setDashboardPeriodFn, { invalidate: false });
   const [customOpen, setCustomOpen] = useState(false);
 
-  async function apply(next: DashboardPeriod, dates?: DateRange) {
+  async function apply(id: number, next: DashboardPeriod, dates?: DateRange) {
     // Stored alongside the navigation, so leaving the page right away does not lose the choice.
     const saved = user.impersonation
       ? null
-      : save.run({ data: { id: dashboardId, period: next, dateFrom: dates?.dateFrom ?? null, dateTo: dates?.dateTo ?? null } });
-    await navigate({ to: "/", search: { d: dashboardId, zeitraum: next, von: dates?.dateFrom, bis: dates?.dateTo }, replace: true });
+      : save.run({ data: { id, period: next, dateFrom: dates?.dateFrom ?? null, dateTo: dates?.dateTo ?? null } });
+    await navigate({ to: "/", search: { d: id, zeitraum: next, von: dates?.dateFrom, bis: dates?.dateTo }, replace: true });
     const result = await saved;
     if (result && !result.ok) onNotice({ tone: "warn", text: t("dashboard.period.notSaved", { reason: result.error }) });
   }
 
-  return (
-    <div className="period-picker">
-      <Field label={t("dashboard.period.label")} className="field-inline">
-        {(control) => (
-          <select
-            {...control}
-            value={period}
-            onChange={(event) => {
-              const next = event.target.value as DashboardPeriod;
-              if (next === "custom") setCustomOpen(true);
-              else void apply(next);
-            }}
-          >
-            {DASHBOARD_PERIODS.map((value) => (
-              <option key={value} value={value}>
-                {value === "custom" ? t("dashboard.period.customOption") : t(`periods.${value}`)}
-              </option>
-            ))}
-          </select>
-        )}
-      </Field>
-      {period === "custom" && (
+  if (dashboardId === null) return { choice: null, dialog: null };
+  const customRange = f.dateRange(range.dateFrom, range.dateTo);
+  return {
+    choice: {
+      label: t("dashboard.period.label"),
+      display: "select",
+      value: period,
+      options: DASHBOARD_PERIODS.map((value) => ({
+        value,
+        label: value === "custom" ? t("dashboard.period.customOption") : t(`periods.${value}`),
+      })),
+      onChange: (value) => {
+        const next = value as DashboardPeriod;
+        if (next === "custom") setCustomOpen(true);
+        else void apply(dashboardId, next);
+      },
+      summary: period === "custom" ? customRange : t(`periods.${period}`),
+      extra: period === "custom" && (
         <button
           type="button"
           className="btn btn-sm"
-          aria-label={t("dashboard.period.change", { range: f.dateRange(range.dateFrom, range.dateTo) })}
+          aria-label={t("dashboard.period.change", { range: customRange })}
           onClick={() => setCustomOpen(true)}
         >
-          <Icon name="clock" size={16} /> {f.dateRange(range.dateFrom, range.dateTo)}
+          <Icon name="clock" size={16} /> {customRange}
         </button>
-      )}
-      {customOpen && (
-        <CustomRangeDialog
-          initial={range}
-          onClose={() => setCustomOpen(false)}
-          onApply={(dates) => {
-            setCustomOpen(false);
-            void apply("custom", dates);
-          }}
-        />
-      )}
-    </div>
-  );
+      ),
+    },
+    dialog: customOpen && (
+      <CustomRangeDialog
+        initial={range}
+        onClose={() => setCustomOpen(false)}
+        onApply={(dates) => {
+          setCustomOpen(false);
+          void apply(dashboardId, "custom", dates);
+        }}
+      />
+    ),
+  };
 }
 
 function CustomRangeDialog({

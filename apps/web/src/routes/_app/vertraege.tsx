@@ -153,11 +153,7 @@ function ContractsPage() {
       <PageHead
         eyebrow={view?.name ?? data.preferences.allViewName ?? t("contracts.views.all")}
         title={t("contracts.title")}
-        actions={
-          <button type="button" className="btn btn-primary" onClick={() => setEditing({ initial: null })}>
-            <Icon name="plus" size={18} /> {t("contracts.create")}
-          </button>
-        }
+        actions={[{ label: t("contracts.create"), icon: "plus", primary: true, onSelect: () => setEditing({ initial: null }) }]}
       />
       <NoticeBanner notice={notice} onClose={clear} />
       {draftError && <Banner tone="danger">{draftError}</Banner>}

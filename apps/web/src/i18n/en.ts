@@ -24,6 +24,7 @@ export const en = {
     optional: "optional",
     actions: "Actions",
     actionsFor: "Actions for {name}",
+    moreActions: "More actions",
     search: "Search",
     copy: "Copy",
     copied: "Copied",
@@ -873,7 +874,6 @@ export const en = {
       hint: "Detected from the last 12 months",
     },
     ai: {
-      recategorize: "Recategorize",
       recategorizeTitle: "Recategorize",
       recategorizeIntro: "Bookings of this view go to the AI. Manual categories and your own rules stay untouched.",
       targetLegend: "Which bookings?",

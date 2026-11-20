@@ -1,7 +1,7 @@
 import { createFileRoute, getRouteApi, Link, notFound, redirect, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { AccountMenu, useAlsoAffects } from "../../../components/AccountActions.tsx";
+import { useAccountActions, useAlsoAffects } from "../../../components/AccountActions.tsx";
 import { AccountBadge, AccountStatus, balanceAsOf, formatIban, SharingBadge } from "../../../components/AccountBits.tsx";
 import { BalanceTimeline } from "../../../components/BalanceTimeline.tsx";
 import { coveredText } from "../../../components/BankDialogs.tsx";
@@ -15,8 +15,8 @@ import { SavedFilters } from "../../../components/SavedFilters.tsx";
 import { Banner, NoticeBanner, Status, Tag } from "../../../components/Status.tsx";
 import { TransactionDrawer, type TransactionItem } from "../../../components/TransactionDrawer.tsx";
 import { translator } from "../../../i18n/index.ts";
-import { useI18n, useT } from "../../../i18n/react.tsx";
-import { errorMessage, type Notice, useAction, useNotice } from "../../../lib/action.ts";
+import { useI18n } from "../../../i18n/react.tsx";
+import { errorMessage, useAction, useNotice } from "../../../lib/action.ts";
 import {
   BOOKING_SORTS,
   type BookingSort,
@@ -135,6 +135,13 @@ function AccountPage() {
   const patch = (values: Record<string, unknown>) => show(parseSearch({ ...search, ...values }));
   const [chartWindow, setChartWindow] = useState<{ accountId: number; shown: DateWindow } | null>(null);
   const chartId = useId();
+  const accountActions = useAccountActions({ account, context: data.context, onNotice: setNotice });
+  const markRead = useAction(markAllReadFn);
+
+  async function readAll() {
+    const result = await markRead.run({ data: { accountId: account.id } });
+    setNotice(result.ok ? { tone: "ok", text: t("transactions.allMarkedRead") } : { tone: "danger", text: result.error });
+  }
 
   return (
     <>
@@ -145,13 +152,18 @@ function AccountPage() {
           </Link>
         }
         title={account.name}
-        actions={
-          <>
-            {data.bookings.quick.unread > 0 && <MarkAccountRead accountId={account.id} onNotice={setNotice} />}
-            <AccountMenu account={account} context={data.context} onNotice={setNotice} />
-          </>
-        }
+        actions={[
+          data.bookings.quick.unread > 0 && {
+            label: t("transactions.markAllRead"),
+            icon: "check",
+            disabled: markRead.busy,
+            busy: markRead.busy,
+            onSelect: readAll,
+          },
+        ]}
+        menu={{ name: account.name, items: accountActions.items }}
       />
+      {accountActions.dialogs}
       <NoticeBanner notice={notice} onClose={clear} />
       <section className="card account-hero" aria-labelledby="account-balance">
         <div className="account-hero-main">
@@ -544,25 +556,5 @@ function AccountBookings({
         />
       )}
     </div>
-  );
-}
-
-/** Marks every new booking of this account read; the "Neu" marks and the badges update with the page data. */
-function MarkAccountRead({ accountId, onNotice }: { accountId: number; onNotice: (notice: Notice | null) => void }) {
-  const t = useT();
-  const mark = useAction(markAllReadFn);
-  return (
-    <button
-      type="button"
-      className="btn"
-      disabled={mark.busy}
-      aria-busy={mark.busy}
-      onClick={async () => {
-        const result = await mark.run({ data: { accountId } });
-        onNotice(result.ok ? { tone: "ok", text: t("transactions.allMarkedRead") } : { tone: "danger", text: result.error });
-      }}
-    >
-      <Icon name="check" size={18} /> {t("transactions.markAllRead")}
-    </button>
   );
 }

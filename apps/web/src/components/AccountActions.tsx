@@ -1,7 +1,7 @@
 import { CSV_PRESETS, type CsvMapping, type CsvPreset, guessMapping, parseCsv, parseCsvAmount, readCsvBookings } from "@saldo/core";
 import { getRouteApi, useNavigate, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { type ChangeEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useI18n, useT } from "../i18n/react.tsx";
 import { errorMessage, type Notice, useAction } from "../lib/action.ts";
 import { csvExportUrl } from "../lib/booking-filter.ts";
@@ -118,22 +118,20 @@ export function parseAmount(text: string): number | null {
 type Item = SheetAction | false | null | undefined;
 
 /**
- * Everything one can do with an account, in one menu: bank actions (they act on the whole connection), editing,
- * sharing and the bookkeeping of accounts without a bank connection. With `sheet`, the row also offers the
- * `ActionSheet`, which adds reading, export and navigation; on phones its button takes the place of the menu's.
- * While a superuser views Saldo as someone else, only the actions that change nothing are offered.
+ * Everything one can do with an account: bank actions (they act on the whole connection), editing, sharing and the
+ * bookkeeping of accounts without a bank connection, as `items` for its menu, and the longer `sheetItems` for the sheet,
+ * which adds reading, export and navigation. The caller shows `dialogs`. While a superuser views Saldo as someone else,
+ * only the actions that change nothing are offered.
  */
-export function AccountMenu({
+export function useAccountActions({
   account,
   context,
   onNotice,
-  sheet,
 }: {
   account: AccountSummary;
   context: AccountContext;
   onNotice: (notice: Notice) => void;
-  sheet?: { open: boolean; onOpen: () => void; onClose: () => void };
-}) {
+}): { items: Item[]; sheetItems: Item[]; dialogs: ReactNode } {
   const { t } = useI18n();
   const { user } = appRoute.useRouteContext();
   const [open, setOpen] = useState<DialogKind | null>(null);
@@ -255,20 +253,11 @@ export function AccountMenu({
     accessItem,
     ...later,
   ];
-  if (!sheet && !items.some(Boolean)) return null;
   const close = () => setOpen(null);
   const saved = (text: string) => onNotice({ tone: "ok", text });
 
-  return (
+  const dialogs = (
     <>
-      <ActionMenu name={account.name} items={items} />
-      {sheet && (
-        <button type="button" className="btn btn-sm btn-icon account-sheet-button" aria-haspopup="dialog" onClick={sheet.onOpen}>
-          <Icon name="more" size={18} />
-          <span className="visually-hidden">{t("common.actionsFor", { name: account.name })}</span>
-        </button>
-      )}
-      {sheet?.open && <ActionSheet title={account.name} items={sheetItems} onClose={sheet.onClose} />}
       {open === "edit" && <EditAccountDialog account={account} onClose={close} onSaved={saved} />}
       {open === "share" && <ShareDialog account={account} onClose={close} onSaved={saved} />}
       {open === "balance" && <BalanceDialog account={account} entries={context.balanceEntries} onClose={close} onSaved={saved} />}
@@ -297,6 +286,37 @@ export function AccountMenu({
       >
         <p>{t("accounts.actions.deleteText")}</p>
       </ConfirmDialog>
+    </>
+  );
+  return { items, sheetItems, dialogs };
+}
+
+/**
+ * The account's actions behind a "⋯" button. With `sheet`, the row also offers the `ActionSheet`; on phones its button
+ * takes the place of the menu's.
+ */
+export function AccountMenu({
+  account,
+  context,
+  onNotice,
+  sheet,
+}: {
+  account: AccountSummary;
+  context: AccountContext;
+  onNotice: (notice: Notice) => void;
+  sheet: { open: boolean; onOpen: () => void; onClose: () => void };
+}) {
+  const t = useT();
+  const { items, sheetItems, dialogs } = useAccountActions({ account, context, onNotice });
+  return (
+    <>
+      <ActionMenu name={account.name} items={items} />
+      <button type="button" className="btn btn-sm btn-icon account-sheet-button" aria-haspopup="dialog" onClick={sheet.onOpen}>
+        <Icon name="more" size={18} />
+        <span className="visually-hidden">{t("common.actionsFor", { name: account.name })}</span>
+      </button>
+      {sheet.open && <ActionSheet title={account.name} items={sheetItems} onClose={sheet.onClose} />}
+      {dialogs}
     </>
   );
 }

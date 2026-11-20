@@ -1,5 +1,5 @@
-import { useT } from "../i18n/react.tsx";
-import { Field } from "./Field.tsx";
+import type { Translate } from "../i18n/index.ts";
+import type { PageChoice } from "./PageHead.tsx";
 
 type Group = { id: number; name: string };
 
@@ -9,33 +9,18 @@ export function knownGroup(groups: readonly Group[], groupId: number | undefined
 }
 
 /** Narrows a page to one group of accounts; only offered when there is more than one group to choose from. */
-export function GroupSelect({
-  groups,
-  value,
-  onChange,
-}: {
-  groups: readonly Group[];
-  value: number | null;
-  onChange: (groupId: number | undefined) => void;
-}) {
-  const t = useT();
+export function groupChoice(
+  t: Translate,
+  groups: readonly Group[],
+  value: number | null,
+  onChange: (groupId: number | undefined) => void,
+): PageChoice | null {
   if (groups.length < 2) return null;
-  return (
-    <Field label={t("common.fields.group")} className="field-inline">
-      {(control) => (
-        <select
-          {...control}
-          value={value ?? ""}
-          onChange={(event) => onChange(event.target.value ? Number(event.target.value) : undefined)}
-        >
-          <option value="">{t("common.allAccounts")}</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </select>
-      )}
-    </Field>
-  );
+  return {
+    label: t("common.fields.group"),
+    display: "select",
+    value: value === null ? "" : String(value),
+    options: [{ value: "", label: t("common.allAccounts") }, ...groups.map((g) => ({ value: String(g.id), label: g.name }))],
+    onChange: (next) => onChange(next ? Number(next) : undefined),
+  };
 }

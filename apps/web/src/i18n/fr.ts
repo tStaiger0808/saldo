@@ -24,6 +24,7 @@ export const fr = {
     optional: "facultatif",
     actions: "Actions",
     actionsFor: "Actions pour {name}",
+    moreActions: "Plus d’actions",
     search: "Rechercher",
     copy: "Copier",
     copied: "Copié",
@@ -889,7 +890,6 @@ export const fr = {
       hint: "Détectés sur les 12 derniers mois",
     },
     ai: {
-      recategorize: "Recatégoriser",
       recategorizeTitle: "Recatégoriser",
       recategorizeIntro:
         "Les opérations de cette vue sont envoyées à l’IA. Les catégories manuelles et vos propres règles restent intactes.",

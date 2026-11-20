@@ -20,7 +20,7 @@ import { Balance, Money } from "../../../components/Bits.tsx";
 import { ConfirmDialog } from "../../../components/Dialog.tsx";
 import { FoldBody, FoldToggle } from "../../../components/Fold.tsx";
 import { Icon } from "../../../components/Icon.tsx";
-import { PageHead } from "../../../components/PageHead.tsx";
+import { type PageAction, PageHead } from "../../../components/PageHead.tsx";
 import { useShortcutHint } from "../../../components/Shortcuts.tsx";
 import { Banner, NoticeBanner, Status, Tag } from "../../../components/Status.tsx";
 import type { Translate } from "../../../i18n/index.ts";
@@ -140,35 +140,29 @@ function AccountsPage() {
   const byId = new Map(data.accounts.map((a) => [a.id, a]));
   const listedTwice = grouping === "group" && sections.reduce((n, s) => n + s.accountIds.length, 0) > data.accounts.length;
   const chartId = useId();
+  const syncAll = useSyncAllAction();
 
   return (
     <>
       <PageHead
         eyebrow={t("common.allAccounts")}
         title={t("accounts.title")}
-        actions={
-          <>
-            {data.accounts.length > 0 && (
-              // biome-ignore lint/a11y/useSemanticElements: a toolbar of toggle buttons, not a form fieldset
-              <div className="segmented" role="group" aria-label={t("accounts.groupBy")}>
-                {(Object.keys(GROUPINGS) as GroupingParam[]).map((param) => (
-                  <button
-                    key={param}
-                    type="button"
-                    aria-pressed={grouping === GROUPINGS[param]}
-                    onClick={() => navigate({ search: { nach: param }, replace: true, resetScroll: false })}
-                  >
-                    {t(`accounts.grouping.${GROUPINGS[param]}`)}
-                  </button>
-                ))}
-              </div>
-            )}
-            {data.accounts.some((a) => a.connection?.canManage) && <SyncAllButton />}
-            <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
-              <Icon name="plus" size={18} /> {t("accounts.add.title")}
-            </button>
-          </>
-        }
+        choices={[
+          data.accounts.length > 0 && {
+            label: t("accounts.groupBy"),
+            display: "segmented",
+            value: search.nach ?? "gruppen",
+            options: (Object.keys(GROUPINGS) as GroupingParam[]).map((param) => ({
+              value: param,
+              label: t(`accounts.grouping.${GROUPINGS[param]}`),
+            })),
+            onChange: (param) => navigate({ search: { nach: param as GroupingParam }, replace: true, resetScroll: false }),
+          },
+        ]}
+        actions={[
+          data.accounts.some((a) => a.connection?.canManage) && syncAll,
+          { label: t("accounts.add.title"), icon: "plus", primary: true, onSelect: () => setAdding(true) },
+        ]}
       />
       {callback && <NoticeBanner notice={callback} onClose={() => navigate({ search: { nach: search.nach }, replace: true })} />}
       <NoticeBanner notice={notice} onClose={clear} />
@@ -491,21 +485,17 @@ function ValueChange({ change }: { change: NonNullable<AccountSummary["change"]>
 }
 
 /** Fetches every connection the viewer manages, like "Konten abrufen" in the navigation. */
-function SyncAllButton() {
+function useSyncAllAction(): PageAction {
   const { t } = useI18n();
   const { syncAll, syncing, running } = useBankJobs();
   const hint = useShortcutHint("sync");
-  return (
-    <button
-      type="button"
-      className="btn sync-btn"
-      onClick={syncAll}
-      disabled={syncing}
-      aria-busy={syncing || running}
-      aria-keyshortcuts={hint.aria}
-      title={hint.title(t("shell.syncAccounts"))}
-    >
-      <Icon name="sync" size={18} /> {syncing ? t("shell.syncStarting") : t("shell.syncAccounts")}
-    </button>
-  );
+  return {
+    label: syncing ? t("shell.syncStarting") : t("shell.syncAccounts"),
+    icon: "sync",
+    onSelect: syncAll,
+    disabled: syncing,
+    busy: syncing || running,
+    keyshortcuts: hint.aria,
+    title: hint.title(t("shell.syncAccounts")),
+  };
 }

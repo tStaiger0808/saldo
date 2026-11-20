@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useT } from "../i18n/react.tsx";
 import { useExitWhenHidden } from "../lib/motion.ts";
 import { Icon } from "./Icon.tsx";
@@ -9,31 +9,47 @@ export type ActionMenuItem = {
   /** Destructive actions are listed last, below a separator and in red. */
   danger?: boolean;
   disabled?: boolean;
-  /** Makes the item a checkbox (`menuitemcheckbox`) with a check mark while on. */
+  /** Makes the item a checkbox (`menuitemcheckbox`) with a check mark while on; in a group, a radio item. */
   checked?: boolean;
 };
+
+/** A labelled set of radio items (`menuitemradio`); `checked` marks the chosen one. */
+export type ActionMenuGroup = { group: string; items: ActionMenuItem[] };
+
+export type ActionMenuEntry = ActionMenuItem | ActionMenuGroup;
+
+const isGroup = (entry: ActionMenuEntry): entry is ActionMenuGroup => "group" in entry;
 
 const GAP = 4;
 const EDGE = 8;
 
 const menuItems = (menu: HTMLElement | null) => [
-  ...(menu?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"]') ?? []),
+  ...(menu?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]') ?? []),
 ];
 
 /**
  * "⋯" button with the secondary actions of a row, following the WAI-ARIA menu button pattern. Choosing an item gives
  * focus back to the button before the action runs, so a dialog opened by it returns focus there when it closes.
+ * `label` replaces the button's name "Aktionen für {name}".
  */
-export function ActionMenu({ name, items }: { name: string; items: (ActionMenuItem | false | null | undefined)[] }) {
+export function ActionMenu({
+  name,
+  label,
+  items,
+}: {
+  name?: string;
+  label?: string;
+  items: (ActionMenuEntry | false | null | undefined)[];
+}) {
   const t = useT();
   const id = useId();
   const [open, setOpen] = useState<"first" | "last" | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
-  const visible = items.filter((item): item is ActionMenuItem => Boolean(item));
-  const regular = visible.filter((item) => !item.danger);
-  const danger = visible.filter((item) => item.danger);
+  const visible = items.flatMap((entry) => (entry && (!isGroup(entry) || entry.items.length > 0) ? [entry] : []));
+  const regular = visible.filter((entry) => isGroup(entry) || !entry.danger);
+  const danger = visible.filter((entry): entry is ActionMenuItem => !isGroup(entry) && Boolean(entry.danger));
 
   function close(restoreFocus: boolean) {
     setOpen(null);
@@ -48,19 +64,27 @@ export function ActionMenu({ name, items }: { name: string; items: (ActionMenuIt
       const anchor = button.current?.getBoundingClientRect();
       const node = menu.current;
       if (!anchor || !node) return;
-      const fitsBelow = anchor.bottom + GAP + node.offsetHeight <= window.innerHeight - EDGE;
-      const top = fitsBelow || anchor.top - GAP - node.offsetHeight < EDGE ? anchor.bottom + GAP : anchor.top - GAP - node.offsetHeight;
-      node.style.top = `${top}px`;
+      // A menu taller than the room on either side scrolls within the larger one.
+      const height = node.scrollHeight + node.offsetHeight - node.clientHeight;
+      const below = window.innerHeight - EDGE - anchor.bottom - GAP;
+      const above = anchor.top - GAP - EDGE;
+      const downwards = height <= below || (height > above && below >= above);
+      const room = downwards ? below : above;
+      node.style.maxHeight = height > room ? `${room}px` : "";
+      node.style.top = `${downwards ? anchor.bottom + GAP : anchor.top - GAP - Math.min(height, room)}px`;
       node.style.left = `${Math.max(EDGE, Math.min(anchor.right - node.offsetWidth, window.innerWidth - node.offsetWidth - EDGE))}px`;
     };
     place();
     const list = menuItems(menu.current);
     (open === "first" ? list[0] : list.at(-1))?.focus();
+    const follow = (event: Event) => {
+      if (!menu.current?.contains(event.target as Node)) place();
+    };
     window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
+    window.addEventListener("scroll", follow, true);
     return () => {
       window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("scroll", follow, true);
     };
   }, [open]);
 
@@ -126,41 +150,60 @@ export function ActionMenu({ name, items }: { name: string; items: (ActionMenuIt
     item.onSelect();
   }
 
-  const checkable = visible.some((item) => item.checked !== undefined);
-  const renderItem = (item: ActionMenuItem) => {
-    const className = item.danger ? "action-menu-item danger" : "action-menu-item";
-    const mark = checkable && (
-      <span className="action-menu-check" aria-hidden="true">
-        {item.checked && <Icon name="check" size={16} />}
-      </span>
+  const checkable = visible.some((entry) => isGroup(entry) || entry.checked !== undefined);
+  const renderItem = (item: ActionMenuItem, radio = false) => {
+    const props = {
+      type: "button" as const,
+      tabIndex: -1,
+      className: item.danger ? "action-menu-item danger" : "action-menu-item",
+      "aria-disabled": item.disabled || undefined,
+      onClick: () => choose(item),
+    };
+    const content = (
+      <>
+        {checkable && (
+          <span className="action-menu-check" aria-hidden="true">
+            {item.checked && <Icon name="check" size={16} />}
+          </span>
+        )}
+        {item.label}
+      </>
     );
-    return item.checked === undefined ? (
-      <button
-        key={item.label}
-        type="button"
-        role="menuitem"
-        tabIndex={-1}
-        className={className}
-        aria-disabled={item.disabled || undefined}
-        onClick={() => choose(item)}
-      >
-        {mark}
-        {item.label}
+    if (radio) {
+      return (
+        <button key={item.label} {...props} role="menuitemradio" aria-checked={Boolean(item.checked)}>
+          {content}
+        </button>
+      );
+    }
+    if (item.checked !== undefined) {
+      return (
+        <button key={item.label} {...props} role="menuitemcheckbox" aria-checked={item.checked}>
+          {content}
+        </button>
+      );
+    }
+    return (
+      <button key={item.label} {...props} role="menuitem">
+        {content}
       </button>
-    ) : (
-      <button
-        key={item.label}
-        type="button"
-        role="menuitemcheckbox"
-        aria-checked={item.checked}
-        tabIndex={-1}
-        className={className}
-        aria-disabled={item.disabled || undefined}
-        onClick={() => choose(item)}
-      >
-        {mark}
-        {item.label}
-      </button>
+    );
+  };
+  // Groups stand apart from their neighbours by a separator on each side.
+  const renderEntry = (entry: ActionMenuEntry, index: number) => {
+    if (!isGroup(entry)) return renderItem(entry);
+    return (
+      <Fragment key={`group:${entry.group}`}>
+        {index > 0 && <hr className="action-menu-separator" />}
+        {/* biome-ignore lint/a11y/useSemanticElements: a group of menu items, not a form fieldset */}
+        <div role="group" aria-label={entry.group} className="action-menu-group">
+          <div className="action-menu-label" aria-hidden="true">
+            {entry.group}
+          </div>
+          {entry.items.map((item) => renderItem(item, true))}
+        </div>
+        {index < regular.length - 1 && !isGroup(regular[index + 1] as ActionMenuEntry) && <hr className="action-menu-separator" />}
+      </Fragment>
     );
   };
 
@@ -179,7 +222,7 @@ export function ActionMenu({ name, items }: { name: string; items: (ActionMenuIt
         onKeyDown={onButtonKeyDown}
       >
         <Icon name="more" size={18} />
-        <span className="visually-hidden">{t("common.actionsFor", { name })}</span>
+        <span className="visually-hidden">{label ?? t("common.actionsFor", { name: name ?? "" })}</span>
       </button>
       {open && (
         <div
@@ -191,9 +234,9 @@ export function ActionMenu({ name, items }: { name: string; items: (ActionMenuIt
           className="action-menu-list"
           onKeyDown={onMenuKeyDown}
         >
-          {regular.map(renderItem)}
+          {regular.map(renderEntry)}
           {regular.length > 0 && danger.length > 0 && <hr className="action-menu-separator" />}
-          {danger.map(renderItem)}
+          {danger.map((item) => renderItem(item))}
         </div>
       )}
     </div>

@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { BookingTable, ListEnd, PendingHiddenNote, QuickFilters, TotalsBar } from "../../components/BookingList.tsx";
 import { ConfirmDialog } from "../../components/Dialog.tsx";
 import { FilterBar } from "../../components/Filters.tsx";
-import { Icon } from "../../components/Icon.tsx";
 import { PageHead } from "../../components/PageHead.tsx";
-import { RecategorizeButton, type ScopeStart } from "../../components/Recategorize.tsx";
+import { type ScopeStart, useRecategorize } from "../../components/Recategorize.tsx";
 import { SavedFilters } from "../../components/SavedFilters.tsx";
 import { Banner, NoticeBanner } from "../../components/Status.tsx";
 import { TransactionDrawer, type TransactionItem } from "../../components/TransactionDrawer.tsx";
@@ -92,6 +91,7 @@ function TransactionsPage() {
   const { notice, setNotice, clear } = useNotice();
   const markAll = useAction(markAllReadFn);
   const admin = managesHousehold(user);
+  const recategorize = useRecategorize({ groupId: filter.groupId ?? null, start: recategorizeStart(filter), onNotice: setNotice });
   const accountNames = new Map(accounts.map((a) => [a.id, a.name]));
   const group = filter.groupId === undefined ? null : (groups.find((g) => g.id === filter.groupId) ?? null);
   const sort: BookingSort = search.sortierung ?? "datum";
@@ -143,26 +143,24 @@ function TransactionsPage() {
       <PageHead
         eyebrow={group?.name ?? t("common.allAccounts")}
         title={t("shell.transactions")}
-        actions={
-          <>
-            <a className="btn" href={csvExportUrl(filter)} download>
-              <Icon name="download" size={18} /> {t("transactions.exportCsv")}
-            </a>
-            {unread > 0 && (
-              <button type="button" className="btn" disabled={markAll.busy} aria-busy={markAll.busy} onClick={() => setConfirmRead(true)}>
-                <Icon name="check" size={18} /> {t("transactions.markAllRead")}
-              </button>
-            )}
-            {aiReady && managesHousehold(user) && (
-              <RecategorizeButton
-                groupId={filter.groupId ?? null}
-                start={recategorizeStart(filter)}
-                label={t("transactions.recategorize")}
-                onNotice={setNotice}
-              />
-            )}
-          </>
-        }
+        actions={[
+          { label: t("transactions.exportCsv"), icon: "download", href: csvExportUrl(filter) },
+          unread > 0 && {
+            label: t("transactions.markAllRead"),
+            icon: "check",
+            disabled: markAll.busy,
+            busy: markAll.busy,
+            onSelect: () => setConfirmRead(true),
+          },
+          aiReady &&
+            admin && {
+              label: t("transactions.recategorize"),
+              icon: "sparkles",
+              disabled: recategorize.busy || recategorize.running,
+              busy: recategorize.busy,
+              onSelect: recategorize.open,
+            },
+        ]}
       />
       <NoticeBanner notice={notice} onClose={clear} />
       <section className="card card-flush bookings-card" aria-labelledby="txn-title">
@@ -211,6 +209,7 @@ function TransactionsPage() {
           onSaved={(text) => setNotice({ tone: "ok", text })}
         />
       )}
+      {recategorize.dialogs}
       <ConfirmDialog
         open={confirmRead}
         title={t("transactions.confirmRead.title", { count: unread })}

@@ -83,7 +83,7 @@ export function FilterBar({
           </Field>
           <div className="actions">
             <button type="submit" className="btn">
-              <Icon name="search" size={18} /> {t("common.search")}
+              <Icon name="search" size={18} /> <span className="btn-label">{t("common.search")}</span>
             </button>
             <button
               ref={button}
@@ -95,7 +95,7 @@ export function FilterBar({
               aria-label={active > 0 ? t("filters.openActive", { count: active }) : undefined}
               onClick={() => setDialog(true)}
             >
-              <Icon name="filter" size={18} /> {t("filters.open")}
+              <Icon name="filter" size={18} /> <span className="btn-label">{t("filters.open")}</span>
               {active > 0 && (
                 <>
                   {" "}

@@ -2,8 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Amount, Money, TableWrap } from "../../components/Bits.tsx";
 import { MonthChart, RankedBars } from "../../components/Charts.tsx";
 import { CategoryMatrix, categoryItems, monthSeries, RecurringTable } from "../../components/DashboardCards.tsx";
-import { Field } from "../../components/Field.tsx";
-import { GroupSelect, knownGroup } from "../../components/GroupSelect.tsx";
+import { groupChoice, knownGroup } from "../../components/GroupSelect.tsx";
 import { PageHead } from "../../components/PageHead.tsx";
 import { useFormat, useI18n } from "../../i18n/react.tsx";
 import { compareTotals } from "../../lib/cards.ts";
@@ -91,30 +90,17 @@ function AnalysisPage() {
       <PageHead
         eyebrow={viewName}
         title={t("shell.analysis")}
-        actions={
-          <>
-            <GroupSelect
-              groups={groups}
-              value={groupId}
-              onChange={(gruppe) => navigate({ search: (prev) => ({ ...prev, gruppe }), replace: true })}
-            />
-            <Field label={t("common.fields.period")} className="field-inline">
-              {(control) => (
-                <select
-                  {...control}
-                  value={data.period}
-                  onChange={(event) => navigate({ search: (prev) => ({ ...prev, zeitraum: event.target.value as Period }), replace: true })}
-                >
-                  {PERIODS.map((value) => (
-                    <option key={value} value={value}>
-                      {t(`periods.${value}`)}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </Field>
-          </>
-        }
+        choices={[
+          groupChoice(t, groups, groupId, (gruppe) => navigate({ search: (prev) => ({ ...prev, gruppe }), replace: true })),
+          {
+            label: t("common.fields.period"),
+            display: "select",
+            value: data.period,
+            options: PERIODS.map((value) => ({ value, label: t(`periods.${value}`) })),
+            onChange: (value) => navigate({ search: (prev) => ({ ...prev, zeitraum: value as Period }), replace: true }),
+            summary: t(`periods.${data.period}`),
+          },
+        ]}
       />
       <section className="card" aria-labelledby="cmp-title">
         <div className="card-head">

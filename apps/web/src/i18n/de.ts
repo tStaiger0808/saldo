@@ -23,6 +23,7 @@ export const de = {
     optional: "optional",
     actions: "Aktionen",
     actionsFor: "Aktionen für {name}",
+    moreActions: "Weitere Aktionen",
     search: "Suchen",
     copy: "Kopieren",
     copied: "Kopiert",
@@ -876,7 +877,6 @@ export const de = {
       hint: "Erkannt aus den letzten 12 Monaten",
     },
     ai: {
-      recategorize: "Neu kategorisieren",
       recategorizeTitle: "Neu kategorisieren",
       recategorizeIntro: "Buchungen dieser Ansicht gehen an die KI. Manuelle Kategorien und eigene Regeln bleiben unangetastet.",
       targetLegend: "Welche Buchungen?",

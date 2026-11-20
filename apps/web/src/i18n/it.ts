@@ -24,6 +24,7 @@ export const it = {
     optional: "facoltativo",
     actions: "Azioni",
     actionsFor: "Azioni per {name}",
+    moreActions: "Altre azioni",
     search: "Cerca",
     copy: "Copia",
     copied: "Copiato",
@@ -875,7 +876,6 @@ export const it = {
       hint: "Rilevati negli ultimi 12 mesi",
     },
     ai: {
-      recategorize: "Ricategorizza",
       recategorizeTitle: "Ricategorizza",
       recategorizeIntro: "I movimenti di questa vista vengono inviati all’IA. Le categorie manuali e le tue regole restano invariate.",
       targetLegend: "Quali movimenti?",

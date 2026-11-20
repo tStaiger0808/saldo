@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../i18n/react.tsx";
 import { type Notice, useAction } from "../lib/action.ts";
 import { useFormErrors } from "../lib/forms.ts";
@@ -7,7 +7,6 @@ import { resolveDashboardPeriod, resolvePeriod } from "../lib/periods.ts";
 import { recategorizePreviewFn, startRecategorizeFn } from "../server/functions/ai.ts";
 import { ConfirmDialog, FormDialog } from "./Dialog.tsx";
 import { Field } from "./Field.tsx";
-import { Icon } from "./Icon.tsx";
 import { Banner } from "./Status.tsx";
 import { statusLabel, type TaskView, useTasks } from "./Tasks.tsx";
 
@@ -33,19 +32,18 @@ function rangeOf(choice: ScopeChoice, from: string, to: string): { dateFrom: str
 
 /**
  * "Mit KI neu kategorisieren": pick a period, see how many counterparties that sends, confirm, and the run continues as a
- * background task. `onNotice` reports the start and how the task ended; the page data reloads when it is done.
+ * background task. `onNotice` reports the start and how the task ended; the page data reloads when it is done. The page
+ * shows `dialogs` and calls `open` from its action.
  */
-export function RecategorizeButton({
+export function useRecategorize({
   groupId,
   start,
-  label,
   onNotice,
 }: {
   groupId: number | null;
   start?: ScopeStart;
-  label?: string;
   onNotice: (notice: Notice | null) => void;
-}) {
+}): { open: () => void; busy: boolean; running: boolean; dialogs: ReactNode } {
   const { t } = useI18n();
   const router = useRouter();
   const { tasks, refresh } = useTasks();
@@ -53,7 +51,7 @@ export function RecategorizeButton({
   const [choosing, setChoosing] = useState(false);
   const [pending, setPending] = useState<{ scope: Scope; payees: number; bookings: number } | null>(null);
   const [started, setStarted] = useState<string | null>(null);
-  const categorizing = tasks.some((task) => task.status === "running" && CATEGORIZING.has(task.kind));
+  const running = tasks.some((task) => task.status === "running" && CATEGORIZING.has(task.kind));
 
   useEffect(() => {
     const ended = tasks.find((task) => task.id === started && task.status !== "running");
@@ -75,20 +73,8 @@ export function RecategorizeButton({
     await refresh();
   }
 
-  return (
+  const dialogs = (
     <>
-      <button
-        type="button"
-        className="btn"
-        disabled={recategorize.busy || categorizing}
-        aria-busy={recategorize.busy || categorizing}
-        onClick={() => {
-          onNotice(null);
-          setChoosing(true);
-        }}
-      >
-        <Icon name="sparkles" size={18} /> {label ?? t("analysis.ai.recategorize")}
-      </button>
       {choosing && (
         <RecategorizeDialog
           groupId={groupId}
@@ -112,6 +98,15 @@ export function RecategorizeButton({
       </ConfirmDialog>
     </>
   );
+  return {
+    open: () => {
+      onNotice(null);
+      setChoosing(true);
+    },
+    busy: recategorize.busy,
+    running,
+    dialogs,
+  };
 }
 
 const COUNT_DELAY_MS = 300;

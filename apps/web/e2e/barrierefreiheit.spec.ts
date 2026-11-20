@@ -367,7 +367,14 @@ test("on phones nothing scrolls sideways, every control is 44 px and dialogs and
       ["/einstellungen/benutzer", "Benutzer anlegen", () => page.getByRole("button", { name: "Benutzer anlegen" }).click()],
       ["/einstellungen/ki", "KI-Anbieter hinzufügen", () => page.getByRole("button", { name: "Anbieter hinzufügen" }).click()],
       ["/vertraege", "Neuer Vertrag", () => page.getByRole("button", { name: "Vertrag anlegen" }).click()],
-      ["/", "Neues Dashboard", () => page.getByRole("button", { name: "Neues Dashboard" }).click()],
+      [
+        "/",
+        "Neues Dashboard",
+        async () => {
+          await page.getByRole("button", { name: "Weitere Aktionen" }).click();
+          await page.getByRole("menuitem", { name: "Neues Dashboard" }).click();
+        },
+      ],
     ];
     for (const [path, title, open] of dialogs) {
       await visit(page, path);
@@ -505,15 +512,21 @@ test("at 375 px the admin forms can be filled in and saved", async ({ browser })
   await expect(page.getByRole("list", { name: "Aktive Filter" }).getByRole("listitem")).toHaveCount(2);
   await expectNoHorizontalScroll(page, "Buchungen mit Filtern");
 
+  // On a phone the period is a radio group in the head's ⋯ menu, and the eyebrow names the chosen one.
   await visit(page, "/");
-  await page.getByLabel("Zeitraum", { exact: true }).selectOption("custom");
+  const more = page.getByRole("button", { name: "Weitere Aktionen" });
+  await more.click();
+  await page.getByRole("menuitemradio", { name: "Eigener Zeitraum …" }).click();
   const range = page.getByRole("dialog", { name: "Eigener Zeitraum" });
   await range.getByLabel("Von").fill("2026-01-01");
   await range.getByLabel("Bis").fill("2026-03-31");
   await range.getByRole("button", { name: "Übernehmen" }).click();
   await expect(range).toBeHidden();
-  await expect(page.getByRole("button", { name: /^Eigenen Zeitraum ändern/ })).toBeVisible();
-  await page.getByLabel("Zeitraum", { exact: true }).selectOption("this_month");
+  await expect(page.locator(".page-head .eyebrow")).toContainText(/01\.01\.\s*–\s*31\.03\.2026/);
+  await more.click();
+  await expect(page.getByRole("menuitemradio", { name: "Eigener Zeitraum …" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitemradio", { name: "Dieser Monat" }).click();
+  await expect(page.locator(".page-head .eyebrow")).toContainText("Dieser Monat");
 
   await visit(page, "/vertraege");
   await page.getByRole("button", { name: "Vertrag anlegen" }).click();

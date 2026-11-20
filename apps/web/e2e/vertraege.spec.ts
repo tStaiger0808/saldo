@@ -726,7 +726,8 @@ test("on a phone the pages do not scroll sideways and every field of the forms i
   await page.goto("/");
   await page.waitForLoadState("networkidle");
   await expectNoPageScroll(page, "/");
-  await page.getByLabel("Zeitraum", { exact: true }).selectOption("custom");
+  await page.getByRole("button", { name: "Weitere Aktionen" }).click();
+  await page.getByRole("menuitemradio", { name: "Eigener Zeitraum …" }).click();
   const dialog = page.getByRole("dialog", { name: "Eigener Zeitraum" });
   await expectFieldsFit(dialog, 375);
   await dialog.getByRole("button", { name: "Abbrechen" }).click();
