@@ -191,7 +191,7 @@ function AuditSection() {
         <div className="row-between">
           <h2 id="audit-title">{t("audit.title")}</h2>
           <a className="btn btn-sm" href={auditCsvUrl(search)} download>
-            <Icon name="download" size={16} /> {t("audit.exportCsv")}
+            <Icon name="download" size={16} /> <span className="btn-label">{t("audit.exportCsv")}</span>
           </a>
         </div>
         <p className="muted measure">{t("audit.intro", { days: first.retentionDays })}</p>

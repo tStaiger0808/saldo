@@ -248,7 +248,7 @@ function AccountPage() {
           <div className="actions">
             <span className="muted small">{t("transactions.count", { count: data.bookings.total })}</span>
             <Link to="/buchungen" search={{ konto: account.id }} className="btn btn-sm">
-              <Icon name="list" size={16} /> {t("accounts.detail.openInTransactions")}
+              <Icon name="list" size={16} /> <span className="btn-label">{t("accounts.detail.openInTransactions")}</span>
             </Link>
           </div>
         </div>

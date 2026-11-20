@@ -102,7 +102,7 @@ function OverviewPage() {
         <nav className="tabs" aria-label={t("dashboard.tabsLabel")}>
           {dashboards.map((d) => (
             <Link key={d.id} to="/" search={{ d: d.id }} className="tab" aria-current={d.id === active?.id ? "page" : undefined}>
-              {d.name}
+              <span className="tab-label">{d.name}</span>
             </Link>
           ))}
         </nav>

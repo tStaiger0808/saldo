@@ -677,9 +677,8 @@ export const en = {
       bufferHint: "Income minus expenses and savings",
     },
     charts: {
-      viewLabel: "Display: {title}",
-      chart: "Chart",
-      table: "Table",
+      showTable: "Show as table: {title}",
+      showChart: "Show as chart: {title}",
       noTransactions: "No transactions in this period.",
       svgTitle: "{title}: chart; values per month via the Tab key or in the table view",
       slotLabel: "{month}: {values}",

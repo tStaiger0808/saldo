@@ -89,6 +89,7 @@ test("row actions open as a keyboard menu, return focus and pass axe in light an
   await admin.waitForLoadState("networkidle");
   const trigger = admin.getByRole("button", { name: `Aktionen für ${MEMBER.username}` });
   const menu = admin.getByRole("menu", { name: `Aktionen für ${MEMBER.username}` });
+  const edit = menu.getByRole("menuitem", { name: "Bearbeiten" });
   const reset = menu.getByRole("menuitem", { name: "Passwort zurücksetzen" });
   const viewAs = menu.getByRole("menuitem", { name: `Als ${MEMBER.username} ansehen` });
   const remove = menu.getByRole("menuitem", { name: "Löschen" });
@@ -98,17 +99,19 @@ test("row actions open as a keyboard menu, return focus and pass axe in light an
   await trigger.focus();
   await admin.keyboard.press("Enter");
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(edit).toBeFocused();
+  await admin.keyboard.press("ArrowDown");
   await expect(reset).toBeFocused();
   await admin.keyboard.press("ArrowDown");
   await expect(viewAs).toBeFocused();
   await admin.keyboard.press("ArrowDown");
   await expect(remove).toBeFocused();
   await admin.keyboard.press("ArrowDown");
-  await expect(reset).toBeFocused();
+  await expect(edit).toBeFocused();
   await admin.keyboard.press("End");
   await expect(remove).toBeFocused();
   await admin.keyboard.press("Home");
-  await expect(reset).toBeFocused();
+  await expect(edit).toBeFocused();
   await expectNoAxeViolations(admin, "Aktionsmenü (hell)");
   await admin.keyboard.press("Escape");
   await expect(menu).toBeHidden();
@@ -125,7 +128,7 @@ test("row actions open as a keyboard menu, return focus and pass axe in light an
   await expect(trigger).toBeFocused();
 
   await admin.keyboard.press("ArrowDown");
-  await expect(reset).toBeFocused();
+  await expect(edit).toBeFocused();
   await admin.keyboard.press("Tab");
   await expect(menu).toBeHidden();
 

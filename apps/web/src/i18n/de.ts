@@ -679,9 +679,8 @@ export const de = {
       bufferHint: "Einnahmen minus Ausgaben und Gespartes",
     },
     charts: {
-      viewLabel: "Darstellung: {title}",
-      chart: "Diagramm",
-      table: "Tabelle",
+      showTable: "Als Tabelle zeigen: {title}",
+      showChart: "Als Diagramm zeigen: {title}",
       noTransactions: "Keine Buchungen in diesem Zeitraum.",
       svgTitle: "{title}: Diagramm, Werte je Monat per Tab-Taste oder in der Tabellenansicht",
       slotLabel: "{month}: {values}",

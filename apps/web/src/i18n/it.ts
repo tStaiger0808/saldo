@@ -678,9 +678,8 @@ export const it = {
       bufferHint: "Entrate meno uscite e risparmi",
     },
     charts: {
-      viewLabel: "Visualizzazione: {title}",
-      chart: "Grafico",
-      table: "Tabella",
+      showTable: "Mostra come tabella: {title}",
+      showChart: "Mostra come grafico: {title}",
       noTransactions: "Nessun movimento in questo periodo.",
       svgTitle: "{title}: grafico, valori per mese con il tasto Tab o nella vista tabella",
       slotLabel: "{month}: {values}",

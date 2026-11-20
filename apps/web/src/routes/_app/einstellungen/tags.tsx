@@ -47,7 +47,7 @@ function TagsSection() {
           {admin && (
             <div className="actions">
               <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
-                <Icon name="plus" size={18} /> {t("settings.tags.create")}
+                <Icon name="plus" size={18} /> <span className="btn-label">{t("settings.tags.create")}</span>
               </button>
             </div>
           )}

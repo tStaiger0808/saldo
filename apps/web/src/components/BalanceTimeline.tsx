@@ -55,6 +55,10 @@ import { Popover } from "./Popover.tsx";
 
 const HEIGHT = 220;
 const PAD = { top: 12, right: 12, bottom: 28, left: 56 };
+/** Narrow plots run edge to edge and write the value axis into the plot, above its grid lines. */
+const COMPACT_PAD = { top: 24, right: 0, bottom: 28, left: 0 };
+const COMPACT_BELOW = 520;
+const INSET_LABEL_X = 20;
 /** Pixels a press moves before it pans; less is a tap that places the crosshair. */
 const DRAG_START = 6;
 const SETTLE_MS = 400;
@@ -405,41 +409,43 @@ export function BalanceTimeline({
               )}
             </Popover>
           </div>
-          {/* biome-ignore lint/a11y/useSemanticElements: a toolbar of buttons, not a form fieldset */}
-          <div className="timeline-nav" role="group" aria-label={t("timeline.move")}>
-            <NavButton icon disabled={atStart} title={t("timeline.earlierHint")} onClick={() => pan(-0.5)}>
-              <Icon name="chevron-left" size={18} />
-              <span className="visually-hidden">{t("timeline.earlier")}</span>
-            </NavButton>
-            <NavButton icon disabled={atEnd} title={t("timeline.laterHint")} onClick={() => pan(0.5)}>
-              <Icon name="chevron-right" size={18} />
-              <span className="visually-hidden">{t("timeline.later")}</span>
-            </NavButton>
-            <NavButton icon disabled={span >= hi - lo - 1e-3} title={t("timeline.zoomOut")} onClick={() => zoom("out")}>
-              <span aria-hidden="true">−</span>
-              <span className="visually-hidden">{t("timeline.zoomOut")}</span>
-            </NavButton>
-            <NavButton icon disabled={span <= MIN_SPAN + 1e-3} title={t("timeline.zoomIn")} onClick={() => zoom("in")}>
-              <span aria-hidden="true">+</span>
-              <span className="visually-hidden">{t("timeline.zoomIn")}</span>
-            </NavButton>
-            <NavButton disabled={history.length === 0} title={t("timeline.backHint")} onClick={back}>
-              <Icon name="undo" size={16} />
-              {t("timeline.back")}
-            </NavButton>
+          <div className="timeline-tools">
+            {/* biome-ignore lint/a11y/useSemanticElements: a toolbar of buttons, not a form fieldset */}
+            <div className="timeline-nav" role="group" aria-label={t("timeline.move")}>
+              <NavButton disabled={atStart} title={t("timeline.earlierHint")} onClick={() => pan(-0.5)}>
+                <Icon name="chevron-left" size={18} />
+                <span className="visually-hidden">{t("timeline.earlier")}</span>
+              </NavButton>
+              <NavButton disabled={atEnd} title={t("timeline.laterHint")} onClick={() => pan(0.5)}>
+                <Icon name="chevron-right" size={18} />
+                <span className="visually-hidden">{t("timeline.later")}</span>
+              </NavButton>
+              <NavButton disabled={span >= hi - lo - 1e-3} title={t("timeline.zoomOut")} onClick={() => zoom("out")}>
+                <span aria-hidden="true">−</span>
+                <span className="visually-hidden">{t("timeline.zoomOut")}</span>
+              </NavButton>
+              <NavButton disabled={span <= MIN_SPAN + 1e-3} title={t("timeline.zoomIn")} onClick={() => zoom("in")}>
+                <span aria-hidden="true">+</span>
+                <span className="visually-hidden">{t("timeline.zoomIn")}</span>
+              </NavButton>
+              <NavButton disabled={history.length === 0} title={t("timeline.backHint")} onClick={back}>
+                <Icon name="undo" size={16} />
+                <span className="visually-hidden">{t("timeline.back")}</span>
+              </NavButton>
+            </div>
+            <Popover
+              label={t("timeline.help")}
+              className="btn btn-sm btn-icon btn-ghost"
+              trigger={
+                <>
+                  <Icon name="info" size={18} />
+                  <span className="visually-hidden">{t("timeline.help")}</span>
+                </>
+              }
+            >
+              {() => <TimelineHelp />}
+            </Popover>
           </div>
-          <Popover
-            label={t("timeline.help")}
-            className="btn btn-sm btn-icon btn-ghost"
-            trigger={
-              <>
-                <Icon name="info" size={18} />
-                <span className="visually-hidden">{t("timeline.help")}</span>
-              </>
-            }
-          >
-            {() => <TimelineHelp />}
-          </Popover>
         </div>
         <p className="muted small">{t(transfers === "included" ? "timeline.withTransfers" : "timeline.withoutTransfers")}</p>
       </FoldBody>
@@ -547,23 +553,11 @@ function CustomRange({
 }
 
 /** Stays focusable at the end of the range (aria-disabled), so keyboard focus is not lost while paging. */
-function NavButton({
-  disabled,
-  onClick,
-  title,
-  icon = false,
-  children,
-}: {
-  disabled: boolean;
-  onClick: () => void;
-  title: string;
-  icon?: boolean;
-  children: ReactNode;
-}) {
+function NavButton({ disabled, onClick, title, children }: { disabled: boolean; onClick: () => void; title: string; children: ReactNode }) {
   return (
     <button
       type="button"
-      className={icon ? "btn btn-sm btn-icon" : "btn btn-sm"}
+      className="timeline-nav-button"
       title={title}
       aria-disabled={disabled || undefined}
       onClick={disabled ? undefined : onClick}
@@ -622,15 +616,17 @@ function Plot({
   useEffect(() => () => clearTimeout(longPress.current), []);
   const clipId = `${useId().replace(/[^\w-]/g, "")}-clip`;
   const { start, days, values } = series;
-  const plotW = Math.max(1, width - PAD.left - PAD.right);
-  const bottom = HEIGHT - PAD.bottom;
+  const compact = width < COMPACT_BELOW;
+  const pad = compact ? COMPACT_PAD : PAD;
+  const plotW = Math.max(1, width - pad.left - pad.right);
+  const bottom = HEIGHT - pad.bottom;
 
   // Pointer math reads the element's live size, so it stays right between a resize and the next render.
   const geometry = useCallback(() => {
     const rect = el.current?.getBoundingClientRect();
     const scale = rect && rect.width > 0 ? rect.width / width : 1;
-    return { left: (rect?.left ?? 0) + PAD.left * scale, plot: plotW * scale };
-  }, [width, plotW]);
+    return { left: (rect?.left ?? 0) + pad.left * scale, plot: plotW * scale };
+  }, [width, plotW, pad.left]);
   const anchorAt = useCallback(
     (clientX: number) => {
       const g = geometry();
@@ -864,13 +860,15 @@ function Plot({
   const e1 = Math.min(days - 1, d1 + 1);
   const range = extent(values, d0, d1);
   const ticks = range ? valueTicks(range.min, range.max) : [];
-  const y = linear([ticks[0] ?? 0, ticks.at(-1) ?? 1], [bottom, PAD.top]);
-  const x = (day: number) => PAD.left + ((day - vp.from) / (vp.to - vp.from)) * plotW;
+  const y = linear([ticks[0] ?? 0, ticks.at(-1) ?? 1], [bottom, pad.top]);
+  const x = (day: number) => pad.left + ((day - vp.from) / (vp.to - vp.from)) * plotW;
   const points = downsample(values, e0, e1, Math.round(plotW)).map(([d, v]): [number, number] => [x(d), y(v)]);
   const line = linePath(points);
   const [firstX] = points[0] ?? [0];
   const [lastX] = points.at(-1) ?? [0];
-  const labels = xTicks(start, vp, plotW).filter((tick) => x(tick.day) >= PAD.left - 4 && x(tick.day) <= width - 22);
+  const labels = xTicks(start, vp, plotW).filter(
+    (tick) => x(tick.day) >= (compact ? INSET_LABEL_X + 8 : pad.left - 4) && x(tick.day) <= width - 22,
+  );
   const label = (day: number, kind: "day" | "month" | "year") => {
     const iso = dayIso(start, day);
     return kind === "day" ? f.dayShort(iso) : kind === "month" ? f.monthShort(iso) : f.year(iso);
@@ -915,30 +913,36 @@ function Plot({
       <svg viewBox={`0 0 ${width} ${HEIGHT}`} aria-hidden="true" focusable="false">
         <defs>
           <clipPath id={clipId}>
-            <rect x={PAD.left} y={0} width={plotW} height={HEIGHT} />
+            <rect x={pad.left} y={0} width={plotW} height={HEIGHT} />
           </clipPath>
         </defs>
         {ticks.map((tick) => (
           <g key={tick}>
-            <line className={tick === 0 ? "axis-line" : "grid-line"} x1={PAD.left} x2={width - PAD.right} y1={y(tick)} y2={y(tick)} />
-            <text className="money" x={PAD.left - 8} y={y(tick)} dy="0.32em" textAnchor="end">
-              {f.axis(tick)}
-            </text>
+            <line className={tick === 0 ? "axis-line" : "grid-line"} x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} />
+            {compact ? (
+              <text className="money timeline-inset-label" x={INSET_LABEL_X} y={y(tick) - 5}>
+                {f.axis(tick)}
+              </text>
+            ) : (
+              <text className="money" x={pad.left - 8} y={y(tick)} dy="0.32em" textAnchor="end">
+                {f.axis(tick)}
+              </text>
+            )}
           </g>
         ))}
         <g clipPath={`url(#${clipId})`}>
           {points.length > 1 && <path className="timeline-area" d={`${line}L${lastX},${bottom}L${firstX},${bottom}Z`} />}
           {picked && (
             <g className="timeline-selection">
-              <rect x={x(picked[0])} y={PAD.top} width={Math.max(0, x(picked[1]) - x(picked[0]))} height={bottom - PAD.top} />
-              <line x1={x(picked[0])} x2={x(picked[0])} y1={PAD.top} y2={bottom} />
-              <line x1={x(picked[1])} x2={x(picked[1])} y1={PAD.top} y2={bottom} />
+              <rect x={x(picked[0])} y={pad.top} width={Math.max(0, x(picked[1]) - x(picked[0]))} height={bottom - pad.top} />
+              <line x1={x(picked[0])} x2={x(picked[0])} y1={pad.top} y2={bottom} />
+              <line x1={x(picked[1])} x2={x(picked[1])} y1={pad.top} y2={bottom} />
             </g>
           )}
           <path className="timeline-line" d={line} />
           {active !== null && (
             <g className="timeline-cross">
-              <line x1={x(active)} x2={x(active)} y1={PAD.top} y2={bottom} />
+              <line x1={x(active)} x2={x(active)} y1={pad.top} y2={bottom} />
               <circle cx={x(active)} cy={y(values[active] ?? 0)} r={4} />
             </g>
           )}
@@ -949,14 +953,14 @@ function Plot({
           </text>
         ))}
         {!range && (
-          <text x={PAD.left + plotW / 2} y={HEIGHT / 2} textAnchor="middle">
+          <text x={pad.left + plotW / 2} y={HEIGHT / 2} textAnchor="middle">
             {t("timeline.unknown")}
           </text>
         )}
       </svg>
       {cue && <span className="timeline-press-cue" aria-hidden="true" style={{ left: cue.x, top: cue.y }} />}
       {active !== null && (
-        <div className="chart-tooltip" aria-hidden="true" style={{ left: clamp(x(active), 84, width - 84), top: PAD.top }}>
+        <div className="chart-tooltip" aria-hidden="true" style={{ left: clamp(x(active), 84, width - 84), top: pad.top }}>
           <strong>{f.date(dayIso(start, active))}</strong>
           <dl>
             <dt>

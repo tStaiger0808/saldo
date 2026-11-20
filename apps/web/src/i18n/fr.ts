@@ -689,9 +689,8 @@ export const fr = {
       bufferHint: "Revenus moins dépenses et épargne",
     },
     charts: {
-      viewLabel: "Affichage\u00a0: {title}",
-      chart: "Graphique",
-      table: "Tableau",
+      showTable: "Afficher en tableau\u00a0: {title}",
+      showChart: "Afficher en graphique\u00a0: {title}",
       noTransactions: "Aucune opération sur cette période.",
       svgTitle: "{title}\u00a0: graphique, valeurs par mois avec la touche Tab ou dans la vue tableau",
       slotLabel: "{month}\u00a0: {values}",

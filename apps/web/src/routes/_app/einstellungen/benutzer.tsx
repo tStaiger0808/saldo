@@ -116,7 +116,7 @@ function UsersSection() {
           {!superuser && <p className="muted small">{t("users.membersOnly")}</p>}
           <div className="actions">
             <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: "new" })}>
-              <Icon name="plus" size={18} /> {t("users.create")}
+              <Icon name="plus" size={18} /> <span className="btn-label">{t("users.create")}</span>
             </button>
           </div>
         </div>
@@ -171,23 +171,18 @@ function UsersSection() {
                     </span>
                   </td>
                   <td className="row-actions">
-                    <span className="actions">
-                      <button type="button" className="btn btn-sm" onClick={() => setDialog({ kind: "edit", user: u })}>
-                        {t("common.edit")}
-                        <span className="visually-hidden">: {u.username}</span>
-                      </button>
-                      <ActionMenu
-                        name={u.username}
-                        items={[
-                          { label: t("users.resetPassword"), onSelect: () => setDialog({ kind: "password", user: u }) },
-                          superuser &&
-                            u.role !== "superuser" &&
-                            u.id !== me.id && { label: t("impersonation.start", { name: u.username }), onSelect: () => viewAs(u) },
-                          superuser && u.avatar !== null && { label: t("users.removeAvatar"), onSelect: () => dropAvatar(u) },
-                          u.id !== me.id && { label: t("common.delete"), danger: true, onSelect: () => setDeleting(u) },
-                        ]}
-                      />
-                    </span>
+                    <ActionMenu
+                      name={u.username}
+                      items={[
+                        { label: t("common.edit"), onSelect: () => setDialog({ kind: "edit", user: u }) },
+                        { label: t("users.resetPassword"), onSelect: () => setDialog({ kind: "password", user: u }) },
+                        superuser &&
+                          u.role !== "superuser" &&
+                          u.id !== me.id && { label: t("impersonation.start", { name: u.username }), onSelect: () => viewAs(u) },
+                        superuser && u.avatar !== null && { label: t("users.removeAvatar"), onSelect: () => dropAvatar(u) },
+                        u.id !== me.id && { label: t("common.delete"), danger: true, onSelect: () => setDeleting(u) },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}

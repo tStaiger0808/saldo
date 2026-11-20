@@ -5,6 +5,7 @@ import { useAmountsHidden } from "../lib/amounts.ts";
 import type { TransactionSearch } from "../lib/booking-filter.ts";
 import { barPath, linear, linePath, niceTicks, useChartWidth } from "../lib/chart.ts";
 import { Money, TableWrap, useMaskAmounts } from "./Bits.tsx";
+import { Icon } from "./Icon.tsx";
 
 export type Series = { key: string; name: string; color: string; values: number[] };
 
@@ -16,15 +17,17 @@ function ChartFrame({ title, legend, table, children }: { title: string; legend?
     <div className="stack-sm">
       <div className="chart-toolbar">
         {legend ?? <span />}
-        {/* biome-ignore lint/a11y/useSemanticElements: a toolbar of toggle buttons, not a form fieldset */}
-        <div className="segmented" role="group" aria-label={t("dashboard.charts.viewLabel", { title })}>
-          <button type="button" aria-pressed={view === "chart"} onClick={() => setView("chart")}>
-            {t("dashboard.charts.chart")}
-          </button>
-          <button type="button" aria-pressed={view === "table"} onClick={() => setView("table")}>
-            {t("dashboard.charts.table")}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-sm btn-icon btn-ghost chart-view-toggle"
+          title={t(view === "chart" ? "dashboard.charts.showTable" : "dashboard.charts.showChart", { title })}
+          onClick={() => setView(view === "chart" ? "table" : "chart")}
+        >
+          <Icon name={view === "chart" ? "table" : "chart"} size={18} />
+          <span className="visually-hidden">
+            {t(view === "chart" ? "dashboard.charts.showTable" : "dashboard.charts.showChart", { title })}
+          </span>
+        </button>
       </div>
       {view === "chart" ? children : table}
     </div>

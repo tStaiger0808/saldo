@@ -296,6 +296,16 @@ test("scrolling condenses the page head to one line and back", async () => {
   expect(await head.evaluate((e) => e.getBoundingClientRect().height)).toBeLessThan(tall);
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(head).not.toHaveAttribute("data-condensed");
+
+  await page.goto("/konten");
+  await page.waitForLoadState("networkidle");
+  const left = (selector: string) => head.locator(selector).evaluate((e) => e.getBoundingClientRect().left);
+  // On top, themes either stack the eyebrow above the title or set it after it; scrolled, the title always leads.
+  expect(await left(".page-title > h1")).toBeLessThanOrEqual(await left(".page-title > .eyebrow"));
+  await page.evaluate(() => window.scrollTo(0, 400));
+  await expect(head).toHaveAttribute("data-condensed", "");
+  expect(await left(".page-title > h1")).toBeLessThan(await left(".page-title > .eyebrow"));
+  await page.evaluate(() => window.scrollTo(0, 0));
 });
 
 test("the accounts pages are keyboard reachable", async () => {

@@ -112,7 +112,7 @@ function McpSection() {
       <section className="card" aria-labelledby="tokens-title">
         <h2 id="tokens-title">{t("settings.mcp.tokens")}</h2>
         <form ref={form} className="row" style={{ alignItems: "flex-end" }} noValidate onSubmit={submit}>
-          <Field label={t("settings.mcp.newTokenName")} error={errors.name}>
+          <Field label={t("settings.mcp.newTokenName")} error={errors.name} className="field-grow">
             {(control) => (
               <input
                 {...control}

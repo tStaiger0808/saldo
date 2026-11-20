@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ActionMenu } from "../../../components/ActionMenu.tsx";
 import { TableWrap } from "../../../components/Bits.tsx";
 import { ConfirmDialog, FormDialog } from "../../../components/Dialog.tsx";
 import { Field } from "../../../components/Field.tsx";
@@ -121,7 +122,7 @@ function RulesSection() {
           <h2 id="rules-title">{t("settings.rules.count", { count: rules.length })}</h2>
           <div className="actions">
             <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
-              <Icon name="plus" size={18} /> {t("settings.rules.create")}
+              <Icon name="plus" size={18} /> <span className="btn-label">{t("settings.rules.create")}</span>
             </button>
           </div>
         </div>
@@ -181,16 +182,13 @@ function RulesSection() {
                       </span>
                     </td>
                     <td className="row-actions">
-                      <span className="actions">
-                        <button type="button" className="btn btn-sm" onClick={() => setEditing(rule)}>
-                          {t("common.edit")}
-                          <span className="visually-hidden">: {rule.pattern}</span>
-                        </button>
-                        <button type="button" className="btn btn-sm btn-danger" onClick={() => setDeleting(rule)}>
-                          {t("common.delete")}
-                          <span className="visually-hidden">: {rule.pattern}</span>
-                        </button>
-                      </span>
+                      <ActionMenu
+                        name={rule.pattern}
+                        items={[
+                          { label: t("common.edit"), onSelect: () => setEditing(rule) },
+                          { label: t("common.delete"), danger: true, onSelect: () => setDeleting(rule) },
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

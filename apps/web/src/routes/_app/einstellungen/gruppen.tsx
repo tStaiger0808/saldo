@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { ActionMenu } from "../../../components/ActionMenu.tsx";
 import { ConfirmDialog, FormDialog } from "../../../components/Dialog.tsx";
 import { CheckGroup, Field } from "../../../components/Field.tsx";
 import { Icon } from "../../../components/Icon.tsx";
@@ -47,7 +48,7 @@ function GroupsSection() {
           <h2 id="groups-title">{t("common.fields.groups")}</h2>
           <div className="actions">
             <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
-              <Icon name="plus" size={18} /> {t("settings.groups.create")}
+              <Icon name="plus" size={18} /> <span className="btn-label">{t("settings.groups.create")}</span>
             </button>
           </div>
         </div>
@@ -66,16 +67,13 @@ function GroupsSection() {
                       : g.accountIds.map((id) => names.get(id) ?? "?").join(", ")}
                   </span>
                 </span>
-                <span className="actions">
-                  <button type="button" className="btn btn-sm" onClick={() => setEditing(g)}>
-                    {t("common.edit")}
-                    <span className="visually-hidden">: {g.name}</span>
-                  </button>
-                  <button type="button" className="btn btn-sm btn-danger" onClick={() => setDeleting(g)}>
-                    {t("common.delete")}
-                    <span className="visually-hidden">: {g.name}</span>
-                  </button>
-                </span>
+                <ActionMenu
+                  name={g.name}
+                  items={[
+                    { label: t("common.edit"), onSelect: () => setEditing(g) },
+                    { label: t("common.delete"), danger: true, onSelect: () => setDeleting(g) },
+                  ]}
+                />
               </li>
             ))}
           </ul>

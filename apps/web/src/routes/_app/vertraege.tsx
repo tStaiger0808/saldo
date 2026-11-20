@@ -267,7 +267,7 @@ function ViewTabs({
     <div className="contract-views">
       <nav className="tabs" aria-label={t("contracts.views.tabsLabel")}>
         <Link to="/vertraege" search={{}} activeOptions={{ exact: true }} className="tab" aria-current={active ? undefined : "page"}>
-          {allLabel}
+          <span className="tab-label">{allLabel}</span>
         </Link>
         {shown.map((v) => (
           <Link
@@ -279,7 +279,7 @@ function ViewTabs({
             aria-current={v.id === active?.id ? "page" : undefined}
             aria-label={sharedHint(v) ? `${v.name}, ${sharedHint(v)}` : undefined}
           >
-            {v.name}
+            <span className="tab-label">{v.name}</span>
             {sharedHint(v) && (
               <span className="tab-shared" title={sharedHint(v) ?? undefined}>
                 <Icon name="users" size={14} />
@@ -307,7 +307,7 @@ function ViewTabs({
       ) : (
         !readOnly && (
           <button type="button" className="btn btn-sm" onClick={() => setDialog(active ? "edit" : "all")}>
-            <Icon name="edit" size={16} /> {t("contracts.views.edit")}
+            <Icon name="edit" size={16} /> <span className="btn-label">{t("contracts.views.edit")}</span>
           </button>
         )
       )}
@@ -790,7 +790,7 @@ function SuggestionRows({ items, actions }: { items: Suggestion[]; actions: Sugg
               aria-label={t("contracts.suggestions.dismissLabel", { name: s.counterparty })}
               onClick={() => actions.drop(s)}
             >
-              {t("contracts.suggestions.dismiss")}
+              <Icon name="close" size={16} /> <span className="btn-label">{t("contracts.suggestions.dismiss")}</span>
             </button>
             <button
               type="button"
@@ -799,7 +799,7 @@ function SuggestionRows({ items, actions }: { items: Suggestion[]; actions: Sugg
               aria-label={t("contracts.suggestions.acceptLabel", { name: s.counterparty })}
               onClick={() => actions.take(s)}
             >
-              {t("contracts.suggestions.accept")}
+              <Icon name="check" size={16} /> <span className="btn-label">{t("contracts.suggestions.accept")}</span>
             </button>
           </span>
         </li>

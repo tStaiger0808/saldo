@@ -19,7 +19,7 @@ export function CopyButton({ text, label, className = "btn" }: { text: string; l
   return (
     <button type="button" className={className} onClick={copy}>
       <Icon name={copied === "ok" ? "check" : "copy"} size={18} />
-      <span aria-live="polite">
+      <span className="btn-label" aria-live="polite">
         {copied === "ok" ? t("common.copied") : copied === "fail" ? t("common.copyFailed") : (label ?? t("common.copy"))}
       </span>
     </button>

@@ -98,7 +98,7 @@ function AiSection() {
           <h2 id="ai-title">{t("settings.ai.title")}</h2>
           <div className="actions">
             <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
-              <Icon name="plus" size={18} /> {t("settings.ai.add")}
+              <Icon name="plus" size={18} /> <span className="btn-label">{t("settings.ai.add")}</span>
             </button>
           </div>
         </div>

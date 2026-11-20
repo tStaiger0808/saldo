@@ -3,6 +3,7 @@ import { useT } from "../i18n/react.tsx";
 import { useAction, useNotice } from "../lib/action.ts";
 import { isHexColor, useFormErrors } from "../lib/forms.ts";
 import { CATEGORY_KINDS, type CategoryKind } from "../lib/labels.ts";
+import { ActionMenu } from "./ActionMenu.tsx";
 import { ConfirmDialog, FormDialog } from "./Dialog.tsx";
 import { Field } from "./Field.tsx";
 import { Icon } from "./Icon.tsx";
@@ -56,7 +57,7 @@ export function CatalogSection({
           {admin && (
             <div className="actions">
               <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
-                <Icon name="plus" size={18} /> {t(`settings.${catalog}.create`)}
+                <Icon name="plus" size={18} /> <span className="btn-label">{t(`settings.${catalog}.create`)}</span>
               </button>
             </div>
           )}
@@ -75,16 +76,13 @@ export function CatalogSection({
                       {item.name}
                     </span>
                     {admin && (
-                      <span className="actions">
-                        <button type="button" className="btn btn-sm" onClick={() => setEditing(item)}>
-                          {t("common.edit")}
-                          <span className="visually-hidden">: {item.name}</span>
-                        </button>
-                        <button type="button" className="btn btn-sm btn-danger" onClick={() => setDeleting(item)}>
-                          {t("common.delete")}
-                          <span className="visually-hidden">: {item.name}</span>
-                        </button>
-                      </span>
+                      <ActionMenu
+                        name={item.name}
+                        items={[
+                          { label: t("common.edit"), onSelect: () => setEditing(item) },
+                          { label: t("common.delete"), danger: true, onSelect: () => setDeleting(item) },
+                        ]}
+                      />
                     )}
                   </li>
                 ))}

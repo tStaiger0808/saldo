@@ -289,7 +289,7 @@ function TargetsCard({ overview, notify }: { overview: Overview; notify: Notify 
         <h2 id="targets-title">{t("backup.targets.title")}</h2>
         <div className="actions">
           <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
-            <Icon name="plus" size={18} /> {t("backup.targets.add")}
+            <Icon name="plus" size={18} /> <span className="btn-label">{t("backup.targets.add")}</span>
           </button>
         </div>
       </div>

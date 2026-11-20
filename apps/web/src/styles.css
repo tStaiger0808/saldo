@@ -2204,6 +2204,17 @@ select:focus-visible {
   .data-table.responsive .row-actions .actions {
     flex-wrap: wrap;
   }
+  /* A row's lone ⋯ sits in the top corner of its card instead of on a line of its own. */
+  .data-table.responsive tr:has(> td.row-actions > .action-menu:only-child) {
+    position: relative;
+    padding-right: 48px;
+  }
+  .data-table.responsive td.row-actions:has(> .action-menu:only-child) {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    grid-column: auto;
+  }
   .data-table.responsive tr[data-unread] {
     box-shadow: inset 3px 0 0 var(--accent);
   }
@@ -2639,6 +2650,23 @@ kbd {
   .shortcut-settings-table td.row-actions {
     width: auto;
     margin-left: auto;
+  }
+  /* With combinations only, the action and its keys share one line and the column label is not needed. */
+  .shortcut-settings-table tr:not(:has(> td:nth-of-type(3))) {
+    column-gap: 8px;
+  }
+  .shortcut-settings-table tr:not(:has(> td:nth-of-type(3))) > th {
+    flex: 1 1 7rem;
+    hyphens: auto;
+  }
+  .shortcut-settings-table tr:not(:has(> td:nth-of-type(3))) > td:first-of-type {
+    margin-left: auto;
+  }
+  .shortcut-settings-table tr:not(:has(> td:nth-of-type(3))) .cell-label {
+    display: none;
+  }
+  .shortcut-settings-table td.row-actions:empty {
+    display: none;
   }
 }
 .facts {
@@ -3287,6 +3315,7 @@ fieldset.field > .segmented {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 16px;
+  min-width: 0;
   margin-left: auto;
 }
 .ranked-name a:hover {
@@ -3402,10 +3431,16 @@ fieldset.field > .segmented {
 }
 .chart-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
+}
+.chart-toolbar > :first-child {
+  min-width: 0;
+}
+.chart-view-toggle {
+  flex: none;
+  margin-block: -6px;
 }
 .spark {
   position: relative;
@@ -4041,6 +4076,8 @@ fieldset.field > .segmented {
 }
 .field-inline select {
   width: auto;
+  min-width: 0;
+  max-width: 100%;
 }
 .toasts {
   position: fixed;
@@ -4757,12 +4794,6 @@ fieldset.event-row > legend + * {
   .filter-top > .filter-toolbar > .field {
     max-width: none;
   }
-  .quick-filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    max-width: 100%;
-    scrollbar-width: none;
-  }
   .totals-bar {
     gap: 2px 12px;
     padding: 6px 16px calc(6px + env(safe-area-inset-bottom));
@@ -4774,11 +4805,19 @@ fieldset.event-row > legend + * {
     width: 100%;
   }
   .totals-figure {
+    flex-wrap: wrap;
     justify-content: space-between;
+    column-gap: 8px;
+    min-width: 0;
     font-size: 13px;
   }
   .totals-figure dt {
     font-size: 12px;
+  }
+  /* A long amount moves under its label instead of running into the figure beside it. */
+  .totals-figure dd {
+    margin-left: auto;
+    white-space: nowrap;
   }
 }
 @media (pointer: coarse) {
@@ -5197,6 +5236,19 @@ dialog.drawer[open]::backdrop {
 .timeline-plot[data-dragging] {
   cursor: grabbing;
 }
+/* In a narrow plot the value labels sit on the plot, so they get a halo of the card colour to stay readable. */
+.timeline-inset-label {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+@media (max-width: 560px) {
+  .timeline-plot {
+    margin-inline: -20px;
+    border-radius: 0;
+  }
+}
 .timeline-plot[data-selecting] {
   cursor: col-resize;
 }
@@ -5363,15 +5415,63 @@ dialog.drawer[open]::backdrop {
   justify-content: space-between;
   gap: 8px 12px;
 }
-.timeline-nav {
+.timeline-tools {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
-.timeline-nav .btn[aria-disabled="true"] {
-  opacity: 0.55;
+/* Moving and zooming read as one compact toolbar, sized like the range presets beside it. */
+.timeline-nav {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.timeline-nav-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.timeline-nav-button:hover:not([aria-disabled="true"]) {
+  background: var(--hover);
+  color: var(--ink);
+}
+.timeline-nav-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+.timeline-nav-button[aria-disabled="true"] {
+  opacity: 0.45;
   cursor: not-allowed;
-  box-shadow: none;
+}
+@media (pointer: coarse) {
+  .timeline-nav-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+/* Once the tools wrap under the presets, the help sits at the end of their line instead of trailing the toolbar. */
+@media (max-width: 560px) {
+  .timeline-tools {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+  .timeline-tools > .popover {
+    margin-left: auto;
+  }
 }
 .popover {
   display: inline-flex;
@@ -5975,12 +6075,18 @@ dialog.drawer[open]::backdrop {
   padding-top: 8px;
   padding-bottom: 8px;
 }
-.page-head[data-condensed] .page-title,
+/* Scrolled, the title keeps leading as it does on top; only a back link goes in front of it. */
+.page-head[data-condensed] .page-title {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  align-items: center;
+  column-gap: 12px;
+}
+.page-head[data-condensed] .page-title:has(.back-link),
 :root[data-theme|="leinen"] .page-head[data-condensed] .page-title:has(.back-link) {
   flex-direction: row-reverse;
   justify-content: flex-end;
-  align-items: center;
-  column-gap: 12px;
 }
 .page-head[data-condensed] .page-title > h1 {
   font-size: 18px;
@@ -5989,8 +6095,11 @@ dialog.drawer[open]::backdrop {
   white-space: nowrap;
 }
 :root .page-head[data-condensed] .eyebrow {
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
   font-size: 13px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -6023,6 +6132,9 @@ dialog.drawer[open]::backdrop {
 }
 :root[data-theme|="leinen"] .btn:not(.btn-primary, .btn-destructive, .btn-danger) {
   border-color: var(--line-strong);
+}
+:root[data-theme|="leinen"] .btn.btn-ghost {
+  border-color: transparent;
 }
 :root[data-theme|="leinen"] .btn-primary:not(.btn-icon, [aria-busy="true"])::after {
   content: "→" / "";
@@ -6230,6 +6342,17 @@ dialog.drawer[open]::backdrop {
 }
 :is(.card-head, .accounts-total-head) > .fold-toggle {
   position: static;
+  flex: none;
+}
+/* The chevron stays on the title's line; a title too long for it ends in "…". */
+:is(.card-head, .accounts-total-head):has(> .fold-toggle) {
+  flex-wrap: nowrap;
+}
+:root .card :is(.card-head, .accounts-total-head):has(> .fold-toggle) > h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 :is(.card-head, .accounts-total-head) > .fold-toggle::after {
   content: "";
@@ -6333,7 +6456,8 @@ dialog.drawer[open]::backdrop {
   .filter-toolbar > .actions > .btn {
     padding: 0 12px;
   }
-  .filter-toolbar .btn-label {
+  /* A button's `.btn-label` gives way to its icon; the label stays its accessible name. */
+  .btn > .btn-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -6341,21 +6465,34 @@ dialog.drawer[open]::backdrop {
     clip-path: inset(50%);
     white-space: nowrap;
   }
+  .btn:has(> .btn-label) {
+    min-width: var(--control-h);
+    padding: 0;
+  }
+  :root[data-theme|="leinen"] .btn-primary:has(> .btn-label)::after {
+    content: none;
+  }
 
   :root[data-theme|="leinen"] .btn.btn-ghost,
-  :root :is(.page-head-compact, .account-section-head) .action-menu > .btn {
+  :root :is(.page-head-compact, .account-section-head, .list, .data-table) .action-menu > .btn,
+  :root :is(.card-head, .row-between, .contract-views) .btn:not(.btn-primary):has(> .btn-label) {
     border-color: transparent;
     background: none;
     box-shadow: none;
   }
-  :root :is(.page-head-compact, .account-section-head) .action-menu > .btn {
+  :root :is(.page-head-compact, .account-section-head, .list, .data-table) .action-menu > .btn,
+  :root :is(.card-head, .row-between, .contract-views) .btn:not(.btn-primary):has(> .btn-label) {
     color: var(--ink-2);
+  }
+  :root :is(.card-head, .row-between, .contract-views) .btn:not(.btn-primary):has(> .btn-label):hover {
+    background: var(--hover);
+    color: var(--ink);
   }
   :root .account-section-head .action-menu > .btn,
   :is(.card-head, .accounts-total-head) > .fold-toggle {
     color: var(--muted);
   }
-  :root :is(.page-head-compact, .account-section-head) .action-menu > .btn:is(:hover, [aria-expanded="true"]) {
+  :root :is(.page-head-compact, .account-section-head, .list, .data-table) .action-menu > .btn:is(:hover, [aria-expanded="true"]) {
     background: var(--hover);
     color: var(--ink);
   }
@@ -6397,5 +6534,82 @@ dialog.drawer[open]::backdrop {
   .account-section-head > .action-menu {
     flex: none;
     margin-left: -4px;
+  }
+
+  /* Tabs stay on one line: the current one keeps its full name, the others shorten with "…". */
+  .tabs {
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+  .tab {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding-inline: 10px;
+  }
+  .tab:is([aria-current="page"], .tab-add) {
+    flex-shrink: 0;
+  }
+  .tab-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .contract-views:has(> .btn) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .contract-views:has(> .btn) > .tabs {
+    flex-basis: 0;
+  }
+  .list > li:has(> .action-menu) {
+    padding-block: 6px;
+  }
+  .list-row:has(> .list-actions .btn-label) > .list-main {
+    flex-basis: 10rem;
+  }
+  .contract-list-tools {
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+  .contract-list-tools > .field-inline {
+    flex: 1 1 12rem;
+  }
+  .contract-list-tools select {
+    flex: 1 1 auto;
+  }
+
+  /* Range presets and the move/zoom toolbar each fill a row; on the narrowest screens their buttons share the width. */
+  .timeline-controls > .segmented,
+  .timeline-nav {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .timeline-controls > .segmented > *,
+  .timeline-nav-button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .timeline-controls > .segmented button {
+    width: 100%;
+    padding-inline: 2px;
+  }
+
+  .filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filters > .field:first-child {
+    grid-column: 1 / -1;
+  }
+  .field-grow {
+    flex: 1 1 12rem;
+  }
+
+  .settings-content {
+    gap: 12px;
+  }
+  .settings-back {
+    align-self: flex-start;
+    margin-block: -8px -4px;
   }
 }
