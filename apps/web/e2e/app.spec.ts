@@ -155,7 +155,7 @@ test("admin edits a booking in the drawer", async () => {
   await expect(admin.getByRole("status").filter({ hasText: "Buchung gespeichert." })).toBeVisible();
   const updated = admin.getByRole("row").filter({ hasText: "Rundfunk ARD ZDF" }).first();
   await expect(updated).toContainText("Abos & Medien");
-  await expect(updated).toContainText("Kategorie gesetzt: von dir");
+  await expect(updated).not.toContainText("Kategorie gesetzt");
   await expect(updated).toContainText("Notiz: Beitrag laut Bescheid");
 });
 
