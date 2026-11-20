@@ -2087,6 +2087,7 @@ select:focus-visible {
   border-top: 1px solid var(--line-soft);
   vertical-align: top;
 }
+.data-table tfoot th,
 .data-table tfoot td {
   border-top: 1px solid var(--line-strong);
   font-weight: 600;
