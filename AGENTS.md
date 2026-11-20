@@ -17,6 +17,10 @@ written for Saldo; never copy code from other projects.
 
 ## Rules
 
+- **Branches**: new work happens on a branch from `develop` (`feature/…`, `fix/…`, `docs/…`) and goes into `develop`
+  by pull request; `develop` goes into `main` by pull request when it is stable. Never commit or push directly to
+  `develop` or `main` (`main` is protected). See `CONTRIBUTING.md`.
+
 - **Roles**: `superuser` (everything, incl. instance settings: bank access, SMTP, AI providers, audit log; sees all
   accounts), `familyAdmin` (household accounts and connections, groups, categories/tags/rules, members), `member` (own
   accounts and bank connections, shares). AI per person (`user.aiAllowed`, superusers always): `requireAi`.

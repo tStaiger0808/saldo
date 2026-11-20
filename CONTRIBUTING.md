@@ -17,14 +17,23 @@ Coding-Agents gleichermaßen.
 
 ## Ablauf
 
+Zwei dauerhafte Branches:
+
+- **`main`** – der veröffentlichte Stand. Ist geschützt: Änderungen nur per Pull Request aus `develop`.
+- **`develop`** – der Integrationsstand. Hier landen alle neuen Funktionen und Fehlerbehebungen zuerst.
+
+So läuft eine Änderung:
+
 1. **Issue zuerst** bei größeren Änderungen: kurz beschreiben, was und warum – dann lässt sich die Richtung abstimmen,
    bevor Arbeit anfällt.
-2. **Eigener Branch** (oder Fork) von `main`, z. B. `feature/vertraege-export` oder `fix/buchungen-filter`. Auf `main`
-   wird nie direkt gepusht.
-3. **Pull Request gegen `main`**, klein und fokussiert, mit einer kurzen Beschreibung: was ändert sich, warum, wie
+2. **Eigener Branch von `develop`** (oder Fork), benannt nach Art und Inhalt, z. B. `feature/vertraege-export`,
+   `fix/buchungen-filter` oder `docs/…`. Auf `develop` und `main` wird nie direkt gepusht.
+3. **Pull Request gegen `develop`**, klein und fokussiert, mit einer kurzen Beschreibung: was ändert sich, warum, wie
    getestet, bei Oberflächenänderungen gern mit Screenshot (Beispieldaten).
-4. **Review**: Der Inhaber prüft und merged. Änderungswünsche bitte als weitere Commits im selben Branch umsetzen;
-   bereits gepushte Commits nicht umschreiben (kein Force-Push).
+4. **Review**: Der Inhaber prüft und merged nach `develop`. Änderungswünsche bitte als weitere Commits im selben Branch
+   umsetzen; bereits gepushte Commits nicht umschreiben (kein Force-Push).
+5. **Release**: Ist `develop` stabil (alle Prüfungen grün), führt der Inhaber `develop` per Pull Request nach `main`
+   zusammen; danach wird `main` ausgeliefert.
 
 ## Entwicklungsumgebung
 
