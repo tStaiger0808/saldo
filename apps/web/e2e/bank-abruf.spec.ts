@@ -187,8 +187,9 @@ test("an account with new bookings opens all its bookings, the new one on top an
 test("a bank asking for a code still opens the job dialog", async () => {
   await page.goto("/konten");
   await row(SECOND)
-    .getByRole("button", { name: new RegExp(`^Abrufen\\s*: ${SECOND}`) })
+    .getByRole("button", { name: `Aktionen für ${SECOND}` })
     .click();
+  await page.getByRole("menuitem", { name: "Abrufen", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Abruf bei der Bank" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Freigabe nötig").first()).toBeVisible();

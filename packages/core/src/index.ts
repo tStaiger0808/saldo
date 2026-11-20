@@ -3,6 +3,7 @@ export * from "./classify.ts";
 export * from "./cleanup.ts";
 export * from "./contracts.ts";
 export * from "./csv.ts";
+export * from "./institutions.ts";
 export * from "./intermediaries.ts";
 export * from "./money.ts";
 export * from "./stats.ts";

@@ -543,7 +543,7 @@ test("on a wide screen the top spans the page and the suggestions stand beside t
   await page.setViewportSize({ width: 1280, height: 720 });
 });
 
-test("amounts are green coming in and red going out, balances only red below zero, and hidden amounts stay neutral", async () => {
+test("amounts and balances are green above zero and red below, and hidden amounts stay neutral", async () => {
   await page.goto(`/buchungen?q=${encodeURIComponent("Muster GmbH")}`);
   const salary = page.getByRole("row").filter({ hasText: "Muster GmbH" }).first().locator(".amount");
   await expect(salary).toHaveClass(/\bamount-in\b/);
@@ -566,7 +566,8 @@ test("amounts are green coming in and red going out, balances only red below zer
   for (const amount of await page.locator("main .account-list .amount").all()) {
     const text = (await amount.textContent()) ?? "";
     if (text.includes("−")) await expect(amount).toHaveClass(/\bamount-out\b/);
-    else await expect(amount).not.toHaveClass(/\bamount-(in|out)\b/);
+    else if (/^\+?0,00/.test(text.trim())) await expect(amount).not.toHaveClass(/\bamount-(in|out)\b/);
+    else await expect(amount).toHaveClass(/\bamount-in\b/);
   }
 
   await page.goto("/buchungen");

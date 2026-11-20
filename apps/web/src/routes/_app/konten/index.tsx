@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useRef, useState } from "react";
-import { type AccountContext, AccountMenu, AccountSyncButton } from "../../../components/AccountActions.tsx";
+import { type AccountContext, AccountMenu } from "../../../components/AccountActions.tsx";
 import {
   AccountBadge,
   AccountStatus,
@@ -18,6 +18,7 @@ import { type Connection, EditConnectionDialog, FinishAuthorizationDialog } from
 import { useBankJobs } from "../../../components/BankJobs.tsx";
 import { Balance, Money } from "../../../components/Bits.tsx";
 import { ConfirmDialog } from "../../../components/Dialog.tsx";
+import { FoldBody, FoldToggle } from "../../../components/Fold.tsx";
 import { Icon } from "../../../components/Icon.tsx";
 import { PageHead } from "../../../components/PageHead.tsx";
 import { useShortcutHint } from "../../../components/Shortcuts.tsx";
@@ -138,6 +139,7 @@ function AccountsPage() {
   const sections = data.sections[grouping];
   const byId = new Map(data.accounts.map((a) => [a.id, a]));
   const listedTwice = grouping === "group" && sections.reduce((n, s) => n + s.accountIds.length, 0) > data.accounts.length;
+  const chartId = useId();
 
   return (
     <>
@@ -184,9 +186,12 @@ function AccountsPage() {
       ) : (
         <>
           <section className="card accounts-total" aria-labelledby="accounts-total-title">
-            <h2 id="accounts-total-title" className="kpi-label">
-              {t("accounts.total")}
-            </h2>
+            <div className="accounts-total-head">
+              <h2 id="accounts-total-title" className="kpi-label">
+                {t("accounts.total")}
+              </h2>
+              {data.timeline && <FoldToggle fold="konten-verlauf" controls={chartId} name={t("accounts.detail.history")} />}
+            </div>
             <p className="accounts-total-value">
               <Balance cents={data.totalCents} unit />
             </p>
@@ -199,7 +204,15 @@ function AccountsPage() {
                 .filter(Boolean)
                 .join(" · ")}
             </p>
-            {data.timeline && <BalanceTimeline title={t("timeline.totalTitle")} timeline={data.timeline} transfers="excluded" />}
+            {data.timeline && (
+              <BalanceTimeline
+                title={t("timeline.totalTitle")}
+                timeline={data.timeline}
+                transfers="excluded"
+                fold="konten-verlauf"
+                bodyId={chartId}
+              />
+            )}
           </section>
           {sections.map((section) => (
             <AccountSection
@@ -283,47 +296,50 @@ function PendingConnections({ connections, onNotice }: { connections: Connection
     <section className="card" aria-labelledby={`${id}-title`}>
       <div className="card-head">
         <h2 id={`${id}-title`}>{t("accounts.pending.title")}</h2>
+        <FoldToggle fold="konten-angefangen" controls={`${id}-body`} name={t("accounts.pending.title")} />
       </div>
-      <p className="muted small">{t("accounts.pending.intro")}</p>
       {error && <Banner tone="danger">{error}</Banner>}
-      <ul className="list">
-        {connections.map((c) => (
-          <li key={c.id} className="list-row">
-            <BankBadge label={"bankName" in c.target ? c.target.bankName || c.name : c.name} logo={connectionLogoUrl(c)} />
-            <span className="list-main">
-              <span className="list-title">
-                {c.name}
-                <Status tone={pendingStatus(c, t).tone} inline detail={c.lastError || undefined}>
-                  {pendingStatus(c, t).text}
-                </Status>
+      <FoldBody fold="konten-angefangen" id={`${id}-body`} className="fold-body">
+        <p className="muted small">{t("accounts.pending.intro")}</p>
+        <ul className="list">
+          {connections.map((c) => (
+            <li key={c.id} className="list-row">
+              <BankBadge label={"bankName" in c.target ? c.target.bankName || c.name : c.name} logo={connectionLogoUrl(c)} />
+              <span className="list-main">
+                <span className="list-title">
+                  {c.name}
+                  <Status tone={pendingStatus(c, t).tone} inline detail={c.lastError || undefined}>
+                    {pendingStatus(c, t).text}
+                  </Status>
+                </span>
+                {c.status === "no_accounts" && <span className="list-sub">{t("banking.authorizedNoAccounts", { name: c.name })}</span>}
+                {c.owner && <span className="list-sub">{t("accounts.sharing.sharedBy", { owner: c.owner })}</span>}
               </span>
-              {c.status === "no_accounts" && <span className="list-sub">{t("banking.authorizedNoAccounts", { name: c.name })}</span>}
-              {c.owner && <span className="list-sub">{t("accounts.sharing.sharedBy", { owner: c.owner })}</span>}
-            </span>
-            <span className="actions list-actions">
-              {c.provider === "enable_banking" ? (
-                <button type="button" className="btn btn-sm btn-primary" disabled={authorize.busy} onClick={() => renew(c)}>
-                  {c.status === "new" ? t("accounts.pending.continue") : t("accounts.actions.renew")}
-                  <span className="visually-hidden">: {c.name}</span>
-                </button>
-              ) : (
-                <button type="button" className="btn btn-sm btn-primary" disabled={discover.busy} onClick={() => check(c)}>
-                  {t("accounts.actions.check")}
-                  <span className="visually-hidden">: {c.name}</span>
-                </button>
-              )}
-              <ActionMenu
-                name={c.name}
-                items={[
-                  c.provider === "enable_banking" && { label: t("banking.page.pasteRedirect"), onSelect: () => setFinishing(true) },
-                  c.provider !== "enable_banking" && { label: t("accounts.actions.access"), onSelect: () => setEditing(c) },
-                  { label: t("common.delete"), danger: true, onSelect: () => setDeleting(c) },
-                ]}
-              />
-            </span>
-          </li>
-        ))}
-      </ul>
+              <span className="actions list-actions">
+                {c.provider === "enable_banking" ? (
+                  <button type="button" className="btn btn-sm btn-primary" disabled={authorize.busy} onClick={() => renew(c)}>
+                    {c.status === "new" ? t("accounts.pending.continue") : t("accounts.actions.renew")}
+                    <span className="visually-hidden">: {c.name}</span>
+                  </button>
+                ) : (
+                  <button type="button" className="btn btn-sm btn-primary" disabled={discover.busy} onClick={() => check(c)}>
+                    {t("accounts.actions.check")}
+                    <span className="visually-hidden">: {c.name}</span>
+                  </button>
+                )}
+                <ActionMenu
+                  name={c.name}
+                  items={[
+                    c.provider === "enable_banking" && { label: t("banking.page.pasteRedirect"), onSelect: () => setFinishing(true) },
+                    c.provider !== "enable_banking" && { label: t("accounts.actions.access"), onSelect: () => setEditing(c) },
+                    { label: t("common.delete"), danger: true, onSelect: () => setDeleting(c) },
+                  ]}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      </FoldBody>
       {finishing && <FinishAuthorizationDialog onClose={() => setFinishing(false)} onDone={onNotice} />}
       {editing && (
         <EditConnectionDialog connection={editing} onClose={() => setEditing(null)} onSaved={(text) => onNotice({ tone: "ok", text })} />
@@ -372,18 +388,24 @@ function AccountSection({
   return (
     <section className="card card-flush account-section" aria-labelledby={`${id}-title`}>
       <div className="account-section-head">
-        <h2 id={`${id}-title`}>{title}</h2>
-        <button type="button" className="section-toggle" aria-expanded={!collapsed} aria-controls={`${id}-list`} onClick={onToggle}>
-          <Icon name="chevron-right" size={16} />
-          {t("accounts.count", { count: accounts.length })}
-        </button>
+        <h2>
+          <button type="button" className="section-toggle" aria-expanded={!collapsed} aria-controls={`${id}-list`} onClick={onToggle}>
+            <span id={`${id}-title`} className="section-title">
+              {title}
+            </span>
+            <span className="section-count">
+              <Icon name="chevron-right" size={16} />
+              {t("accounts.count", { count: accounts.length })}
+            </span>
+          </button>
+        </h2>
         <span className="account-section-total num">
           <span className="visually-hidden">{t("accounts.sectionTotal", { name: title })}: </span>
           <Balance cents={section.subtotalCents} />
         </span>
         {admin && manage && <ActionMenu name={title} items={[{ label: manage.label, onSelect: () => navigate({ to: manage.to }) }]} />}
       </div>
-      <ul id={`${id}-list`} className="account-list" hidden={collapsed}>
+      <ul id={`${id}-list`} className="account-list collapsible" hidden={collapsed}>
         {accounts.map((a) => (
           <AccountItem key={a.id} account={a} context={contextOf(a)} grouping={grouping} onNotice={onNotice} />
         ))}
@@ -408,7 +430,6 @@ function AccountItem({
   return (
     <li className="account-item">
       <AccountRow account={account} grouping={grouping} onLongPress={() => setSheet(true)} />
-      <AccountSyncButton account={account} context={context} onNotice={onNotice} />
       <AccountMenu
         account={account}
         context={context}

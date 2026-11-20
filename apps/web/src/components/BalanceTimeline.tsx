@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useI18n } from "../i18n/react.tsx";
 import { linear, linePath, useChartWidth } from "../lib/chart.ts";
+import type { FoldId } from "../lib/fold.ts";
 import {
   bounds,
   clampViewport,
@@ -48,6 +49,7 @@ import {
 } from "../lib/timeline.ts";
 import type { Timeline } from "../server/modules/accounts/index.ts";
 import { Amount, useMaskAmounts } from "./Bits.tsx";
+import { FoldBody } from "./Fold.tsx";
 import { Icon } from "./Icon.tsx";
 import { Popover } from "./Popover.tsx";
 
@@ -131,16 +133,21 @@ function useSettled<T>(value: T, ms: number): T {
  * presets, or the keyboard. Zoom steps can be undone. The header sums the visible window's bookings (or the selection's
  * while picking one), the table lists it, and changes are announced once they settle. `onWindowChange` hears of each
  * window the user moves to, once it has settled, as ISO days (both included); the window it opens with is not reported.
+ * With `fold`, everything below the header sums folds away (element `bodyId`) while the sums stay.
  */
 export function BalanceTimeline({
   title,
   timeline,
   transfers,
+  fold,
+  bodyId,
   onWindowChange,
 }: {
   title: string;
   timeline: Timeline;
   transfers: "included" | "excluded";
+  fold?: FoldId;
+  bodyId?: string;
   onWindowChange?: (shown: { from: string; to: string }) => void;
 }) {
   const { t, f } = useI18n();
@@ -347,93 +354,95 @@ export function BalanceTimeline({
           </div>
         </dl>
       </div>
-      <Plot
-        series={series}
-        vp={vp}
-        vpRef={vpRef}
-        motion={motion}
-        picker={picker}
-        title={title}
-        valueText={mask(windowText(goal))}
-        hintId={`${id}-hint`}
-        onFocusChange={setPlotFocused}
-      />
-      <Scrubber series={series} vp={vp} vpRef={vpRef} motion={motion} picker={picker} />
-      <div className="timeline-controls">
-        {/* biome-ignore lint/a11y/useSemanticElements: a toolbar of toggle buttons, not a form fieldset */}
-        <div className="segmented" role="group" aria-label={t("timeline.range")}>
-          {PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              aria-pressed={matchesPreset(vp, preset, start, days)}
-              onClick={() => {
-                setSelection(null);
-                setHistory([]);
-                move(presetViewport(preset, start, days), "animate");
-              }}
-            >
-              <span aria-hidden="true">{t(`timeline.preset.${preset}`)}</span>
-              <span className="visually-hidden">{t(`timeline.presetLong.${preset}`)}</span>
-            </button>
-          ))}
-          <Popover
-            label={t("timeline.customTitle")}
-            className="segmented-popover"
-            active={!PRESETS.some((preset) => matchesPreset(vp, preset, start, days))}
-            trigger={t("timeline.custom")}
-          >
-            {(close) => (
-              <CustomRange
-                start={start}
-                days={days}
-                shown={visibleDays(goal, days)}
-                onApply={(next) => {
-                  close();
+      <FoldBody fold={fold} id={bodyId} className="timeline-body">
+        <Plot
+          series={series}
+          vp={vp}
+          vpRef={vpRef}
+          motion={motion}
+          picker={picker}
+          title={title}
+          valueText={mask(windowText(goal))}
+          hintId={`${id}-hint`}
+          onFocusChange={setPlotFocused}
+        />
+        <Scrubber series={series} vp={vp} vpRef={vpRef} motion={motion} picker={picker} />
+        <div className="timeline-controls">
+          {/* biome-ignore lint/a11y/useSemanticElements: a toolbar of toggle buttons, not a form fieldset */}
+          <div className="segmented" role="group" aria-label={t("timeline.range")}>
+            {PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                aria-pressed={matchesPreset(vp, preset, start, days)}
+                onClick={() => {
                   setSelection(null);
-                  motion.zoomTo(next);
+                  setHistory([]);
+                  move(presetViewport(preset, start, days), "animate");
                 }}
-              />
-            )}
+              >
+                <span aria-hidden="true">{t(`timeline.preset.${preset}`)}</span>
+                <span className="visually-hidden">{t(`timeline.presetLong.${preset}`)}</span>
+              </button>
+            ))}
+            <Popover
+              label={t("timeline.customTitle")}
+              className="segmented-popover"
+              active={!PRESETS.some((preset) => matchesPreset(vp, preset, start, days))}
+              trigger={t("timeline.custom")}
+            >
+              {(close) => (
+                <CustomRange
+                  start={start}
+                  days={days}
+                  shown={visibleDays(goal, days)}
+                  onApply={(next) => {
+                    close();
+                    setSelection(null);
+                    motion.zoomTo(next);
+                  }}
+                />
+              )}
+            </Popover>
+          </div>
+          {/* biome-ignore lint/a11y/useSemanticElements: a toolbar of buttons, not a form fieldset */}
+          <div className="timeline-nav" role="group" aria-label={t("timeline.move")}>
+            <NavButton icon disabled={atStart} title={t("timeline.earlierHint")} onClick={() => pan(-0.5)}>
+              <Icon name="chevron-left" size={18} />
+              <span className="visually-hidden">{t("timeline.earlier")}</span>
+            </NavButton>
+            <NavButton icon disabled={atEnd} title={t("timeline.laterHint")} onClick={() => pan(0.5)}>
+              <Icon name="chevron-right" size={18} />
+              <span className="visually-hidden">{t("timeline.later")}</span>
+            </NavButton>
+            <NavButton icon disabled={span >= hi - lo - 1e-3} title={t("timeline.zoomOut")} onClick={() => zoom("out")}>
+              <span aria-hidden="true">−</span>
+              <span className="visually-hidden">{t("timeline.zoomOut")}</span>
+            </NavButton>
+            <NavButton icon disabled={span <= MIN_SPAN + 1e-3} title={t("timeline.zoomIn")} onClick={() => zoom("in")}>
+              <span aria-hidden="true">+</span>
+              <span className="visually-hidden">{t("timeline.zoomIn")}</span>
+            </NavButton>
+            <NavButton disabled={history.length === 0} title={t("timeline.backHint")} onClick={back}>
+              <Icon name="undo" size={16} />
+              {t("timeline.back")}
+            </NavButton>
+          </div>
+          <Popover
+            label={t("timeline.help")}
+            className="btn btn-sm btn-icon btn-ghost"
+            trigger={
+              <>
+                <Icon name="info" size={18} />
+                <span className="visually-hidden">{t("timeline.help")}</span>
+              </>
+            }
+          >
+            {() => <TimelineHelp />}
           </Popover>
         </div>
-        {/* biome-ignore lint/a11y/useSemanticElements: a toolbar of buttons, not a form fieldset */}
-        <div className="timeline-nav" role="group" aria-label={t("timeline.move")}>
-          <NavButton icon disabled={atStart} title={t("timeline.earlierHint")} onClick={() => pan(-0.5)}>
-            <Icon name="chevron-left" size={18} />
-            <span className="visually-hidden">{t("timeline.earlier")}</span>
-          </NavButton>
-          <NavButton icon disabled={atEnd} title={t("timeline.laterHint")} onClick={() => pan(0.5)}>
-            <Icon name="chevron-right" size={18} />
-            <span className="visually-hidden">{t("timeline.later")}</span>
-          </NavButton>
-          <NavButton icon disabled={span >= hi - lo - 1e-3} title={t("timeline.zoomOut")} onClick={() => zoom("out")}>
-            <span aria-hidden="true">−</span>
-            <span className="visually-hidden">{t("timeline.zoomOut")}</span>
-          </NavButton>
-          <NavButton icon disabled={span <= MIN_SPAN + 1e-3} title={t("timeline.zoomIn")} onClick={() => zoom("in")}>
-            <span aria-hidden="true">+</span>
-            <span className="visually-hidden">{t("timeline.zoomIn")}</span>
-          </NavButton>
-          <NavButton disabled={history.length === 0} title={t("timeline.backHint")} onClick={back}>
-            <Icon name="undo" size={16} />
-            {t("timeline.back")}
-          </NavButton>
-        </div>
-        <Popover
-          label={t("timeline.help")}
-          className="btn btn-sm btn-icon btn-ghost"
-          trigger={
-            <>
-              <Icon name="info" size={18} />
-              <span className="visually-hidden">{t("timeline.help")}</span>
-            </>
-          }
-        >
-          {() => <TimelineHelp />}
-        </Popover>
-      </div>
-      <p className="muted small">{t(transfers === "included" ? "timeline.withTransfers" : "timeline.withoutTransfers")}</p>
+        <p className="muted small">{t(transfers === "included" ? "timeline.withTransfers" : "timeline.withoutTransfers")}</p>
+      </FoldBody>
       <p id={`${id}-hint`} className="visually-hidden">
         {t("timeline.hint")}
       </p>

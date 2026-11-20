@@ -180,7 +180,7 @@ const sheetActions = (page: Page) => sheetOf(page).locator(".sheet-action");
 test.beforeAll(seedAccounts);
 test.afterAll(removeAccounts);
 
-test("on a phone every account row keeps its texts on one line, without the sync button", async ({ browser }) => {
+test("on a phone every account row keeps its texts on one line", async ({ browser }) => {
   const page = await newSession(browser, ADMIN, PHONE);
   for (const mode of ["hell", "dunkel"] as const) {
     await setMode(page, mode);
@@ -190,7 +190,6 @@ test("on a phone every account row keeps its texts on one line, without the sync
       await expectNoHorizontalScroll(page);
       expect(await rowProblems(page), path).toEqual([]);
       expect(await brokenWords(page.locator(".account-row, .account-section-head, .page-head")), path).toEqual([]);
-      for (const button of await page.locator(".account-item .sync-btn").all()) await expect(button).toBeHidden();
       await expectNoAxeViolations(page, `${path} (${mode}, 375 px)`);
     }
     const row = depotRow(page);
@@ -389,13 +388,13 @@ test("a member sees only the actions she may take, and so does a superuser viewi
   await admin.context().close();
 });
 
-test("on the desktop the row keeps its sync button and its unchanged ⋯ menu", async ({ browser }) => {
+test("on the desktop the row has no separate sync button: fetching stays first in its unchanged ⋯ menu", async ({ browser }) => {
   const page = await newSession(browser, ADMIN, { viewport: { width: 1280, height: 900 } });
   await page.goto("/konten");
   await page.waitForLoadState("networkidle");
   const item = page.locator(".account-item").filter({ hasText: DEPOT });
-  await expect(item.locator(".sync-btn")).toBeVisible();
-  await expect(item.locator(".sync-btn")).toContainText("Abrufen");
+  await expect(item.getByRole("button")).toHaveCount(1);
+  await expect(item.getByRole("button", { name: /Abrufen/ })).toHaveCount(0);
   await item.getByRole("button", { name: `Aktionen für ${DEPOT}` }).click();
   const menu = page.getByRole("menu", { name: `Aktionen für ${DEPOT}` });
   await expect(menu.getByRole("menuitem").or(menu.getByRole("menuitemcheckbox"))).toHaveText([

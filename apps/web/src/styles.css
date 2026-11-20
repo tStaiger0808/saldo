@@ -4170,6 +4170,15 @@ fieldset.event-row > legend + * {
 .accounts-total {
   gap: 4px;
 }
+.accounts-total-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.accounts-total-head > .fold-toggle {
+  margin-block: -6px;
+}
 .accounts-total-value {
   font-size: 32px;
   font-weight: 600;
@@ -4177,7 +4186,9 @@ fieldset.event-row > legend + * {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* The section's toggle reaches over the whole bar; the total and the menu are positioned later, so they stay on top. */
 .account-section-head {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -4185,54 +4196,81 @@ fieldset.event-row > legend + * {
   padding: 12px 20px;
   border-bottom: 1px solid var(--line-soft);
 }
+.account-section-head:has(.section-toggle:hover) {
+  background: var(--hover);
+}
 .account-section-total {
+  position: relative;
   margin-left: auto;
   font-weight: 600;
+}
+.section-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.section-toggle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.section-toggle:focus-visible {
+  outline: none;
+}
+.section-toggle:focus-visible::after {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.section-title {
+  overflow-wrap: anywhere;
+}
+.section-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.section-toggle:hover .section-count {
+  color: var(--ink);
+}
+.section-toggle .section-count > .icon {
+  transition: transform var(--fade);
+}
+[aria-expanded="true"] > .section-count > .icon {
+  transform: rotate(90deg);
 }
 @media (max-width: 520px) {
   .account-section-head {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "title menu" "toggle total";
+    grid-template-areas: "title menu" "title total";
   }
   .account-section-head > h2 {
     grid-area: title;
-    overflow-wrap: anywhere;
   }
-  .account-section-head > .section-toggle {
-    grid-area: toggle;
-    justify-self: start;
+  .section-title {
+    flex-basis: 100%;
   }
   .account-section-head > .account-section-total {
     grid-area: total;
+    align-self: end;
   }
   .account-section-head > .action-menu {
     grid-area: menu;
+    align-self: start;
   }
-}
-.section-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 0 8px 0 4px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.section-toggle:hover {
-  background: var(--hover);
-  color: var(--ink);
-}
-.section-toggle[aria-expanded] > .icon {
-  transition: transform var(--fade);
-}
-.section-toggle[aria-expanded="true"] > .icon {
-  transform: rotate(90deg);
 }
 .account-section:has(.section-toggle[aria-expanded="false"]) .account-section-head {
   border-bottom: 0;
@@ -4973,14 +5011,14 @@ dialog.drawer[open]::backdrop {
 /*
  * Phones: name and sub line keep one line each and end in "…", the tags turn into text in the sub line and the
  * amount column shows the balance, with a depot's change below; the fetch time is left to screen readers and the
- * account page. Fetching moves to the top bar and the sheet; the "⋯" button opens the sheet instead of the menu.
+ * account page. The "⋯" button opens the sheet instead of the menu.
  */
 @media (max-width: 560px) {
   .account-item {
     gap: 0;
     padding-right: 4px;
   }
-  .account-item > :is(.sync-btn, .action-menu) {
+  .account-item > .action-menu {
     display: none;
   }
   li.account-item > .btn.btn-icon.account-sheet-button {
@@ -5088,6 +5126,14 @@ dialog.drawer[open]::backdrop {
   display: grid;
   gap: 12px;
   min-width: 0;
+}
+/* The gap before a folding part moves into its padding, so folding animates it away instead of dropping it at the end. */
+:is(.timeline-body, .fold-body) {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin-top: -12px;
+  padding-top: 12px;
 }
 .timeline-head {
   display: flex;
@@ -5393,7 +5439,6 @@ dialog.drawer[open]::backdrop {
   }
   .segmented button,
   .tab,
-  .section-toggle,
   .back-link,
   .settings-back,
   .skip-link,
@@ -5629,21 +5674,25 @@ dialog.drawer[open]::backdrop {
   }
 
   /* Opening and closing sections change height smoothly where the browser can animate to `auto`, and at once elsewhere */
-  .account-list {
+  .collapsible {
     interpolate-size: allow-keywords;
     overflow: clip;
+    overflow-clip-margin: 6px;
     transition:
       height 200ms ease-out,
+      padding 200ms ease-out,
       opacity 200ms ease-out,
       display 200ms allow-discrete;
   }
-  .account-list[hidden] {
+  .collapsible[hidden] {
     height: 0;
+    padding-block: 0;
     opacity: 0;
   }
   @starting-style {
-    .account-list:not([hidden]) {
+    .collapsible:not([hidden]) {
       height: 0;
+      padding-block: 0;
       opacity: 0;
     }
   }
@@ -6163,4 +6212,26 @@ dialog.drawer[open]::backdrop {
 }
 .passphrase-strength meter {
   inline-size: min(220px, 100%);
+}
+
+/* ---- Folding sections */
+.collapsible[hidden] {
+  display: none;
+}
+.fold-toggle[aria-expanded] > .icon {
+  transition: transform var(--fade);
+}
+.fold-toggle[aria-expanded="true"] > .icon {
+  transform: rotate(180deg);
+}
+/* Before hydration the server renders every section open; the head script's data-folded closes the remembered ones. */
+:root[data-folded~="konten-verlauf"] [data-fold="konten-verlauf"],
+:root[data-folded~="konto-verlauf"] [data-fold="konto-verlauf"],
+:root[data-folded~="konten-angefangen"] [data-fold="konten-angefangen"] {
+  display: none;
+}
+:root[data-folded~="konten-verlauf"] [data-fold-toggle="konten-verlauf"] > .icon,
+:root[data-folded~="konto-verlauf"] [data-fold-toggle="konto-verlauf"] > .icon,
+:root[data-folded~="konten-angefangen"] [data-fold-toggle="konten-angefangen"] > .icon {
+  transform: none;
 }

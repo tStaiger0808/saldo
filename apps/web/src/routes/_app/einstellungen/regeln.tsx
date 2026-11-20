@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TableWrap } from "../../../components/Bits.tsx";
 import { ConfirmDialog, FormDialog } from "../../../components/Dialog.tsx";
 import { Field } from "../../../components/Field.tsx";
@@ -22,6 +22,66 @@ export const Route = createFileRoute("/_app/einstellungen/regeln")({
 });
 
 type Rule = Awaited<ReturnType<typeof getRules>>[number];
+type SortColumn = "pattern" | "assignment" | "priority";
+type Sort = { column: SortColumn; ascending: boolean };
+
+const SORT_KEY = "fw-regeln-sortierung";
+const DEFAULT_SORT: Sort = { column: "priority", ascending: false };
+
+function readSort(): Sort {
+  try {
+    const value = JSON.parse(localStorage.getItem(SORT_KEY) ?? "null") as Partial<Sort> | null;
+    if (value && ["pattern", "assignment", "priority"].includes(value.column ?? "") && typeof value.ascending === "boolean")
+      return value as Sort;
+  } catch {
+    // Unreadable or blocked storage: the default order.
+  }
+  return DEFAULT_SORT;
+}
+
+function sortRules(rules: readonly Rule[], sort: Sort, categoryName: (rule: Rule) => string): Rule[] {
+  const text = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
+  const compare: Record<SortColumn, (a: Rule, b: Rule) => number> = {
+    pattern: (a, b) => text(a.pattern, b.pattern),
+    assignment: (a, b) => text(categoryName(a), categoryName(b)),
+    priority: (a, b) => a.priority - b.priority,
+  };
+  const direction = sort.ascending ? 1 : -1;
+  return [...rules].sort((a, b) => direction * compare[sort.column](a, b) || text(a.pattern, b.pattern) || a.id - b.id);
+}
+
+/** A column head that sorts the table; a second click turns the order around. */
+function SortableHead({
+  label,
+  column,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string;
+  column: SortColumn;
+  sort: Sort;
+  onSort: (sort: Sort) => void;
+  className?: string;
+}) {
+  const t = useT();
+  const active = sort.column === column;
+  return (
+    <th scope="col" className={className} aria-sort={active ? (sort.ascending ? "ascending" : "descending") : undefined}>
+      <button
+        type="button"
+        className="sort-button"
+        onClick={() => onSort({ column, ascending: active ? !sort.ascending : column !== "priority" })}
+      >
+        {label}
+        <span className="sort-mark" data-active={active || undefined} aria-hidden="true">
+          <Icon name={active && sort.ascending ? "up" : "down"} size={14} />
+        </span>
+        {!active && <span className="visually-hidden">, {t("transactions.sort.sortable")}</span>}
+      </button>
+    </th>
+  );
+}
 type Category = Awaited<ReturnType<typeof getCategories>>[number];
 type TagItem = Awaited<ReturnType<typeof getTags>>[number];
 
@@ -34,6 +94,17 @@ function RulesSection() {
   const t = useT();
   const categoryNames = new Map(categories.map((c) => [c.id, c.name]));
   const tagNames = new Map(tags.map((tag) => [tag.id, tag.name]));
+  const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
+  useEffect(() => setSort(readSort()), []);
+  const changeSort = (next: Sort) => {
+    setSort(next);
+    try {
+      localStorage.setItem(SORT_KEY, JSON.stringify(next));
+    } catch {
+      // The order then lasts for this visit.
+    }
+  };
+  const sorted = sortRules(rules, sort, (rule) => (rule.categoryId ? (categoryNames.get(rule.categoryId) ?? "") : ""));
 
   async function destroy(rule: Rule) {
     const result = await remove.run({ data: { id: rule.id } });
@@ -64,18 +135,16 @@ function RulesSection() {
             <table className="data-table responsive">
               <thead>
                 <tr>
-                  <th scope="col">{t("settings.rules.contains")}</th>
-                  <th scope="col">{t("settings.rules.assignment")}</th>
-                  <th scope="col" className="num">
-                    {t("settings.rules.priority")}
-                  </th>
+                  <SortableHead label={t("settings.rules.contains")} column="pattern" sort={sort} onSort={changeSort} />
+                  <SortableHead label={t("settings.rules.assignment")} column="assignment" sort={sort} onSort={changeSort} />
+                  <SortableHead label={t("settings.rules.priority")} column="priority" sort={sort} onSort={changeSort} className="num" />
                   <th scope="col" className="row-actions">
                     <span className="visually-hidden">{t("common.actions")}</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {rules.map((rule) => (
+                {sorted.map((rule) => (
                   <tr key={rule.id}>
                     <td className="span">
                       <span className="cell-main">

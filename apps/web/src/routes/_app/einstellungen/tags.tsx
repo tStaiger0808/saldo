@@ -5,7 +5,7 @@ import { ItemDialog } from "../../../components/CatalogSection.tsx";
 import { ConfirmDialog, FormDialog } from "../../../components/Dialog.tsx";
 import { Field } from "../../../components/Field.tsx";
 import { Icon } from "../../../components/Icon.tsx";
-import { Banner, NoticeBanner, Tag } from "../../../components/Status.tsx";
+import { Banner, NoticeBanner } from "../../../components/Status.tsx";
 import { useT } from "../../../i18n/react.tsx";
 import { useAction, useNotice } from "../../../lib/action.ts";
 import { useFormErrors } from "../../../lib/forms.ts";
@@ -27,13 +27,11 @@ function TagsSection() {
   const { user } = Route.useRouteContext();
   const admin = managesHousehold(user);
   const t = useT();
-  const [onlyAi, setOnlyAi] = useState(false);
   const [editing, setEditing] = useState<TagRow | "new" | null>(null);
   const [merging, setMerging] = useState<TagRow | null>(null);
   const [deleting, setDeleting] = useState<TagRow | null>(null);
   const { notice, setNotice, clear } = useNotice();
   const remove = useAction(deleteTagFn);
-  const shown = onlyAi ? tags.filter((tag) => tag.createdBy === "ai") : tags;
 
   async function destroy(tag: TagRow) {
     const result = await remove.run({ data: { id: tag.id } });
@@ -56,25 +54,16 @@ function TagsSection() {
         </div>
         <p className="muted measure">{t("settings.tags.intro")}</p>
         {!admin && <p className="muted">{t("settings.tags.adminOnly")}</p>}
-        {tags.length > 0 && (
-          <label className="checkbox">
-            <input type="checkbox" checked={onlyAi} onChange={(event) => setOnlyAi(event.target.checked)} />
-            {t("settings.tags.onlyAi")}
-          </label>
-        )}
         {tags.length === 0 ? (
           <p className="empty">{t("settings.tags.empty")}</p>
-        ) : shown.length === 0 ? (
-          <p className="empty">{t("settings.tags.noneFromAi")}</p>
         ) : (
           <ul className="list">
-            {shown.map((tag) => (
+            {tags.map((tag) => (
               <li key={tag.id} className="list-row">
                 <span className="list-main">
                   <span className="list-title">
                     <span className="swatch" style={{ background: tag.color }} aria-hidden="true" />
                     {tag.name}
-                    {tag.createdBy === "ai" && <Tag>{t("settings.tags.aiBadge")}</Tag>}
                   </span>
                   <span className="list-sub">{t("settings.tags.bookings", { count: tag.bookings })}</span>
                 </span>
@@ -182,7 +171,7 @@ function MergeDialog({
             <option value="">{t("settings.tags.mergePlaceholder")}</option>
             {others.map((other) => (
               <option key={other.id} value={other.id}>
-                {other.createdBy === "ai" ? `${other.name} (${t("settings.tags.aiBadge")})` : other.name}
+                {other.name}
               </option>
             ))}
           </select>

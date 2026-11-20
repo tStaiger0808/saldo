@@ -6,6 +6,8 @@ export const de = {
     cancel: "Abbrechen",
     delete: "Löschen",
     edit: "Bearbeiten",
+    collapse: "{name} einklappen",
+    expand: "{name} ausklappen",
     close: "Schließen",
     add: "Hinzufügen",
     create: "Anlegen",
@@ -1770,9 +1772,6 @@ export const de = {
       deleteText: "Der Tag verschwindet von allen Buchungen und aus allen Regeln.",
       intro:
         "Tags ordnen Buchungen quer zu den Kategorien, etwa „Urlaub“ oder „Home Office“. Tags mit dem Hinweis „von KI“ hat die KI angelegt; prüfe sie gelegentlich.",
-      aiBadge: "von KI",
-      onlyAi: "Nur von der KI angelegte",
-      noneFromAi: "Keine von der KI angelegten Tags.",
       bookings: { zero: "Keine Buchung", one: "{count} Buchung", other: "{count} Buchungen" },
       rename: "Umbenennen",
       merge: "Zusammenführen",
@@ -2236,7 +2235,6 @@ export const de = {
     contractUpcomingToday: "{name}: heute fällig",
     contractUpcomingIn: { one: "{name}: morgen fällig", other: "{name}: fällig in {count} Tagen" },
     contractUpcomingExpense: "Abbuchung von voraussichtlich {amount} am {date}.",
-    contractUpcomingIncome: "Eingang von voraussichtlich {amount} am {date}.",
   },
   accounts: {
     title: "Konten",

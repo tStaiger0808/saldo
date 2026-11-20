@@ -7,6 +7,8 @@ export const fr = {
     cancel: "Annuler",
     delete: "Supprimer",
     edit: "Modifier",
+    collapse: "Replier «\u202f{name}\u202f»",
+    expand: "Déplier «\u202f{name}\u202f»",
     close: "Fermer",
     add: "Ajouter",
     create: "Créer",
@@ -1798,9 +1800,6 @@ export const fr = {
       deleteText: "L’étiquette est retirée de toutes les opérations et de toutes les règles.",
       intro:
         "Les étiquettes regroupent les opérations au-delà des catégories, par exemple «\u202fVacances\u202f» ou «\u202fTélétravail\u202f». Les étiquettes marquées «\u202fpar l’IA\u202f» ont été créées par l’IA\u202f; vérifiez-les de temps en temps.",
-      aiBadge: "par l’IA",
-      onlyAi: "Seulement celles créées par l’IA",
-      noneFromAi: "Aucune étiquette créée par l’IA.",
       bookings: { zero: "Aucune opération", one: "{count} opération", other: "{count} opérations" },
       rename: "Renommer",
       merge: "Fusionner",
@@ -2270,7 +2269,6 @@ export const fr = {
     contractUpcomingToday: "{name} : échéance aujourd’hui",
     contractUpcomingIn: { one: "{name} : échéance demain", other: "{name} : échéance dans {count} jours" },
     contractUpcomingExpense: "Prélèvement d’environ {amount} prévu le {date}.",
-    contractUpcomingIncome: "Encaissement d’environ {amount} prévu le {date}.",
   },
   accounts: {
     title: "Comptes",

@@ -54,41 +54,6 @@ export function useAlsoAffects(account: AccountSummary): string | null {
   return others.length > 0 ? t("accounts.actions.alsoAffects", { names: others.join(", ") }) : null;
 }
 
-/** The visible "Abrufen" beside an account; it fetches the account's whole bank connection. */
-export function AccountSyncButton({
-  account,
-  context,
-  onNotice,
-}: {
-  account: AccountSummary;
-  context: AccountContext;
-  onNotice: (notice: Notice) => void;
-}) {
-  const { t } = useI18n();
-  const { syncConnection, fetching } = useBankJobs();
-  const also = useAlsoAffects(account);
-  const connection = account.connection?.canManage ? context.connection : undefined;
-  if (!connection || connection.status === "new" || connection.linkedAccounts.length === 0) return null;
-  const running = fetching.has(connection.id);
-
-  async function run() {
-    if (!connection) return;
-    const error = await syncConnection(connection.id, connection.name);
-    if (error) onNotice({ tone: "danger", text: error });
-  }
-
-  return (
-    <button type="button" className="btn btn-sm sync-btn" disabled={running} aria-busy={running} title={also ?? undefined} onClick={run}>
-      <Icon name="sync" size={16} />
-      <span className="sync-label">{t("accounts.actions.sync")}</span>
-      <span className="visually-hidden">
-        : {account.name}
-        {also && ` (${also})`}
-      </span>
-    </button>
-  );
-}
-
 function Footer({ busy, label, onClose }: { busy: boolean; label: string; onClose: () => void }) {
   const t = useT();
   return (

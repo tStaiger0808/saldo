@@ -1,6 +1,8 @@
+import { FOLDED_KEY, FOLDS } from "./fold.ts";
+
 /**
- * Colour theme, light/dark mode and hidden amounts live only in the browser (localStorage).
- * `<html>` carries them as data-theme, data-mode and data-amounts; the inline script applies them before the first paint.
+ * Colour theme, light/dark mode, hidden amounts and folded sections live only in the browser (localStorage). `<html>`
+ * carries them as data-theme, data-mode, data-amounts and data-folded; the inline script applies them before the first paint.
  */
 // The ids are stored in browsers, so they stay German; labels live under `themes.*` in the messages.
 export const THEMES = [
@@ -46,7 +48,8 @@ if(t&&Object.prototype.hasOwnProperty.call(r,t)){t=r[t];try{localStorage.setItem
 d.dataset.theme=${JSON.stringify(THEMES.map((t) => t.id))}.indexOf(t)>=0?t:${JSON.stringify(DEFAULT_THEME)};
 if(${JSON.stringify(MODES.map((x) => x.id))}.indexOf(mo)<0)mo=${JSON.stringify(DEFAULT_MODE)};
 d.dataset.mode=mo==="dunkel"||(mo==="system"&&m&&m.matches)?"dark":"light";}
-apply();if(get(${JSON.stringify(AMOUNTS_KEY)})==="hidden")d.dataset.amounts="hidden";if(m&&m.addEventListener)m.addEventListener("change",apply);window.__fwApply=apply})();`;
+apply();if(get(${JSON.stringify(AMOUNTS_KEY)})==="hidden")d.dataset.amounts="hidden";
+var f=(get(${JSON.stringify(FOLDED_KEY)})||"").split(" ").filter(function(x){return ${JSON.stringify(FOLDS)}.indexOf(x)>=0}).join(" ");if(f)d.dataset.folded=f;if(m&&m.addEventListener)m.addEventListener("change",apply);window.__fwApply=apply})();`;
 
 function stored(key: string): string | null {
   try {

@@ -7,6 +7,8 @@ export const en = {
     cancel: "Cancel",
     delete: "Delete",
     edit: "Edit",
+    collapse: "Collapse {name}",
+    expand: "Expand {name}",
     close: "Close",
     add: "Add",
     create: "Create",
@@ -1761,9 +1763,6 @@ export const en = {
       deleteText: "The tag is removed from all transactions and all rules.",
       intro:
         "Tags group transactions across categories, such as “Holiday” or “Home office”. Tags marked “by AI” were created by the AI; review them now and then.",
-      aiBadge: "by AI",
-      onlyAi: "Only created by the AI",
-      noneFromAi: "No tags created by the AI.",
       bookings: { zero: "No transactions", one: "{count} transaction", other: "{count} transactions" },
       rename: "Rename",
       merge: "Merge",
@@ -2224,7 +2223,6 @@ export const en = {
     contractUpcomingToday: "{name}: due today",
     contractUpcomingIn: { one: "{name}: due tomorrow", other: "{name}: due in {count} days" },
     contractUpcomingExpense: "A charge of about {amount} is expected on {date}.",
-    contractUpcomingIncome: "A payment of about {amount} is expected on {date}.",
   },
   accounts: {
     title: "Accounts",

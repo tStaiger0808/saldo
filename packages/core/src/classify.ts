@@ -3,6 +3,7 @@
  * Manual decisions (categorySource "manual", transferManual, manualTagIds) always win; everything
  * else is recomputed from scratch so edited rules apply retroactively.
  */
+import { institutionKeys, namesInstitution } from "./institutions.ts";
 import type { Kind } from "./stats.ts";
 import type { TagSource } from "./tags.ts";
 import { normalize, normalizeIban } from "./text.ts";
@@ -31,6 +32,8 @@ export type ClassifyAccount = {
   transferPatterns: string[];
   ownerUserId?: string | null;
   visibility?: "household" | "private";
+  /** Names its institution goes by (bank, account and connection name); a booking naming it may pair with it. */
+  names?: readonly (string | null | undefined)[];
 };
 
 /**
@@ -81,6 +84,11 @@ export type Classification = {
 };
 
 const PAIRING_WINDOW_DAYS = 5;
+/**
+ * A wallet collects a purchase from the bank by direct debit, which settles one to three business days after the
+ * purchase (five days over a weekend); a bank may also date it up to two days before the wallet does.
+ */
+export const WALLET_WINDOW = { bankBefore: 2, bankAfter: 5 } as const;
 
 function haystack(txn: Pick<ClassifyTxn, "counterparty" | "purpose">, field: RuleField): string {
   if (field === "counterparty") return normalize(txn.counterparty);
@@ -151,13 +159,76 @@ function daysBetween(a: string, b: string): number {
   return Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
 }
 
+type TransferState = Map<number, { isTransfer: boolean; transferAccountId: number | null }>;
+
+/**
+ * Pairs bookings whose counterparty names another own account's institution, for accounts without a known IBAN or
+ * pattern. With an opposite booking there it is an ordinary transfer, both sides marked. A wallet such as PayPal
+ * often delivers no funding booking, only the purchase itself: the bank booking with the same sign and amount is then
+ * the transfer to (or refund from) the wallet, and the wallet's booking stays the expense or income.
+ * Each booking pairs at most once, nearest date first; on a tie the ordinary transfer wins, as an opposite booking is
+ * the explicit funding.
+ */
+function pairByInstitution(txns: ClassifyTxn[], accounts: ClassifyAccount[], state: TransferState): void {
+  const keyed = accounts.map((account) => ({ account, keys: institutionKeys(account.names ?? []) })).filter((a) => a.keys.length);
+  if (keyed.length === 0) return;
+  const accountById = new Map(accounts.map((a) => [a.id, a]));
+  const free = (txn: ClassifyTxn) => !state.get(txn.id)?.isTransfer;
+  const byAccountAmount = new Map<string, ClassifyTxn[]>();
+  for (const txn of txns) {
+    if (txn.amountCents === 0 || !free(txn)) continue;
+    const key = `${txn.accountId}:${txn.amountCents}`;
+    const list = byAccountAmount.get(key);
+    if (list) list.push(txn);
+    else byAccountAmount.set(key, [txn]);
+  }
+
+  type Candidate = { from: ClassifyTxn; other: ClassifyTxn; wallet: boolean; offset: number };
+  const candidates: Candidate[] = [];
+  for (const from of txns) {
+    if (from.transferManual || from.amountCents === 0 || !free(from)) continue;
+    const source = accountById.get(from.accountId);
+    const text = from.counterparty.trim() || from.purpose;
+    for (const { account, keys } of keyed) {
+      if (account.id === from.accountId || (source && !mayTransferBetween(source, account)) || !namesInstitution(text, keys)) continue;
+      for (const other of byAccountAmount.get(`${account.id}:${-from.amountCents}`) ?? []) {
+        const offset = (Date.parse(from.bookingDate) - Date.parse(other.bookingDate)) / 86_400_000;
+        if (!other.transferManual && Math.abs(offset) <= PAIRING_WINDOW_DAYS) candidates.push({ from, other, wallet: false, offset });
+      }
+      for (const other of byAccountAmount.get(`${account.id}:${from.amountCents}`) ?? []) {
+        const offset = (Date.parse(from.bookingDate) - Date.parse(other.bookingDate)) / 86_400_000;
+        if (offset >= -WALLET_WINDOW.bankBefore && offset <= WALLET_WINDOW.bankAfter)
+          candidates.push({ from, other, wallet: true, offset });
+      }
+    }
+  }
+  candidates.sort(
+    (a, b) =>
+      Math.abs(a.offset) - Math.abs(b.offset) ||
+      Number(a.wallet) - Number(b.wallet) ||
+      Number(a.offset < 0) - Number(b.offset < 0) ||
+      a.from.bookingDate.localeCompare(b.from.bookingDate) ||
+      a.from.id - b.from.id ||
+      a.other.id - b.other.id,
+  );
+  const used = new Set<number>();
+  for (const { from, other, wallet } of candidates) {
+    if (used.has(from.id) || used.has(other.id)) continue;
+    used.add(from.id);
+    used.add(other.id);
+    state.set(from.id, { isTransfer: true, transferAccountId: other.accountId });
+    if (!wallet) state.set(other.id, { isTransfer: true, transferAccountId: from.accountId });
+  }
+}
+
 /**
  * Every move between own accounts is a transfer with its target account; whether it counts in a
- * statistic is decided per view (see `internalTo`). The opposite booking on the target is paired.
+ * statistic is decided per view (see `internalTo`). The opposite booking on the target is paired. Bookings whose
+ * counterparty only names another own account's institution are paired afterwards (`pairByInstitution`).
  */
 export function classify(txns: ClassifyTxn[], accounts: ClassifyAccount[], rules: ClassifyRule[]): Map<number, Classification> {
   const ordered = sortedRules(rules);
-  const state = new Map<number, { isTransfer: boolean; transferAccountId: number | null }>();
+  const state: TransferState = new Map();
   for (const txn of txns) {
     state.set(
       txn.id,
@@ -192,6 +263,7 @@ export function classify(txns: ClassifyTxn[], accounts: ClassifyAccount[], rules
       }
     }
   }
+  pairByInstitution(txns, accounts, state);
 
   const result = new Map<number, Classification>();
   for (const txn of txns) {

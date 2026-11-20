@@ -194,6 +194,32 @@ test("rules take a direction in the rule form, the list and the booking drawer, 
   await expect(drawer).toBeHidden();
 });
 
+test("the rules table sorts by each column, turns around on a second click and keeps the order", async () => {
+  await admin.goto("/einstellungen/regeln");
+  await admin.waitForLoadState("networkidle");
+  const table = admin.locator("main table");
+  const patterns = async () =>
+    (await table.locator("tbody tr .cell-title").allTextContents()).map((text) => text.replace(/^.*„|“.*$/g, ""));
+  const byText = (values: string[]) => [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
+  const contains = table.getByRole("columnheader", { name: /Enthält/ });
+  await contains.getByRole("button").click();
+  await expect(contains).toHaveAttribute("aria-sort", "ascending");
+  const ascending = await patterns();
+  expect(ascending).toEqual(byText(ascending));
+  await contains.getByRole("button").click();
+  await expect(contains).toHaveAttribute("aria-sort", "descending");
+  expect(await patterns()).toEqual(byText(ascending).reverse());
+
+  await admin.reload();
+  await expect(table.getByRole("columnheader", { name: /Enthält/ })).toHaveAttribute("aria-sort", "descending");
+  await expectNoAxeViolations(admin, "Regeln sortiert");
+
+  const priority = table.getByRole("columnheader", { name: /Priorität/ });
+  await priority.getByRole("button").click();
+  await expect(priority).toHaveAttribute("aria-sort", "descending");
+});
+
 test("a click beside the booking drawer closes it, a click inside does not", async () => {
   await admin.goto("/buchungen");
   await admin.getByRole("row").filter({ hasText: "Rundfunk ARD ZDF" }).first().getByRole("button", { name: "Rundfunk ARD ZDF" }).click();

@@ -1,6 +1,6 @@
 import { createFileRoute, getRouteApi, Link, notFound, redirect, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AccountMenu, useAlsoAffects } from "../../../components/AccountActions.tsx";
 import { AccountBadge, AccountStatus, balanceAsOf, formatIban, SharingBadge } from "../../../components/AccountBits.tsx";
 import { BalanceTimeline } from "../../../components/BalanceTimeline.tsx";
@@ -8,6 +8,7 @@ import { coveredText } from "../../../components/BankDialogs.tsx";
 import { amountTone, Balance, CopyButton, Money } from "../../../components/Bits.tsx";
 import { BookingTable, ListEnd, PendingHiddenNote, QuickFilters, TotalsBar } from "../../../components/BookingList.tsx";
 import { FilterBar } from "../../../components/Filters.tsx";
+import { FoldToggle } from "../../../components/Fold.tsx";
 import { Icon } from "../../../components/Icon.tsx";
 import { PageHead } from "../../../components/PageHead.tsx";
 import { SavedFilters } from "../../../components/SavedFilters.tsx";
@@ -133,6 +134,7 @@ function AccountPage() {
   const show = (next: AccountSearch) => navigate({ search: next, replace: true, resetScroll: false });
   const patch = (values: Record<string, unknown>) => show(parseSearch({ ...search, ...values }));
   const [chartWindow, setChartWindow] = useState<{ accountId: number; shown: DateWindow } | null>(null);
+  const chartId = useId();
 
   return (
     <>
@@ -212,6 +214,7 @@ function AccountPage() {
       <section className="card" aria-labelledby="account-history">
         <div className="card-head">
           <h2 id="account-history">{t("accounts.detail.history")}</h2>
+          {timeline && <FoldToggle fold="konto-verlauf" controls={chartId} name={t("accounts.detail.history")} />}
         </div>
         {timeline ? (
           <BalanceTimeline
@@ -219,6 +222,8 @@ function AccountPage() {
             title={t("accounts.detail.history")}
             timeline={timeline}
             transfers="included"
+            fold="konto-verlauf"
+            bodyId={chartId}
             onWindowChange={(shown) => setChartWindow({ accountId: account.id, shown })}
           />
         ) : (

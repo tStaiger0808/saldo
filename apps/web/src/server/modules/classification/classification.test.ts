@@ -7,6 +7,7 @@ import type { Viewer } from "../access/index.ts";
 import { addManualBooking, createAccount } from "../accounts/index.ts";
 import { previewRule, saveRule } from "../catalog/index.ts";
 import { createDemoData } from "../seed/demo.ts";
+import { summary } from "../stats/index.ts";
 import { importBookings, patchTransaction } from "../transactions/index.ts";
 import { cleanupAiRules, reclassifyAll } from "./index.ts";
 
@@ -242,5 +243,103 @@ describe("transfers between people", () => {
     const rows = await byId([out, into]);
     expect(rows.get(out)).toMatchObject({ isTransfer: true, transferAccountId: savings });
     expect(rows.get(into)).toMatchObject({ isTransfer: true, transferAccountId: giro });
+  });
+});
+
+describe("payments through a connected wallet", () => {
+  const range = (accountIds: number[]) => ({ dateFrom: "2026-10-01", dateTo: "2026-11-30", accountIds });
+  const stored = (accountId: number, externalId: string, bookingDate: string, amountCents: number, counterparty: string, purpose = "") => ({
+    accountId,
+    externalId,
+    source: "test",
+    bookingDate,
+    amountCents,
+    counterparty,
+    purpose,
+  });
+
+  it("stops counting a PayPal purchase twice, on import and for stored bookings, idempotently", async () => {
+    const dkb = await dkbId();
+    const paypal = await createAccount(db(), admin, { name: "PayPal", bank: "paypal", kind: "checking", color: "#000000" });
+    // Bookings stored before wallet pairing existed: the bank debit and the purchase both count as expenses.
+    const rows = await db()
+      .insert(transactions)
+      .values([
+        stored(
+          dkb,
+          "pp-1",
+          "2026-11-05",
+          -4_999,
+          "PayPal (Europe) S.à r.l. et Cie, S.C.A.",
+          "1054534523152/PP.8419.PP/. AliExpress, Ihr Einkauf bei AliExpress",
+        ),
+        stored(paypal, "pp-2", "2026-11-03", -4_999, "AliExpress"),
+        stored(dkb, "pp-3", "2026-11-12", -1_000, "PayPal Europe S.a.r.l. et Cie", "PP.8420.PP . Spotify AB, Ihr Einkauf bei Spotify AB"),
+        stored(paypal, "pp-4", "2026-11-12", -1_000, "Spotify AB"),
+        stored(dkb, "pp-5", "2026-11-14", -2_000, "PayPal Europe S.a.r.l. et Cie", "PP.8421.PP . Thalia, Ihr Einkauf bei Thalia"),
+        stored(paypal, "pp-6", "2026-11-14", -2_500, "Thalia"),
+        stored(paypal, "pp-7", "2026-11-14", 1_500, "Max Mustermann", "Anteil Pizza"),
+      ])
+      .returning({ id: transactions.id });
+    const [aliDebit, aliPurchase, spotifyDebit, spotifyPurchase, partial, partialPurchase, receipt] = rows.map((r) => r.id) as number[] as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+    const before = await summary(db(), admin, range([dkb, paypal]));
+
+    await reclassifyAll(db());
+    const after = await summary(db(), admin, range([dkb, paypal]));
+    expect(before.expensesCents - after.expensesCents).toBe(4_999 + 1_000);
+    expect(after.incomeCents).toBe(before.incomeCents);
+    const fixed = await byId([aliDebit, aliPurchase, spotifyDebit, spotifyPurchase, partial, partialPurchase, receipt]);
+    expect(fixed.get(aliDebit)).toMatchObject({ isTransfer: true, transferAccountId: paypal, categoryId: null });
+    expect(fixed.get(spotifyDebit)).toMatchObject({ isTransfer: true, transferAccountId: paypal });
+    for (const id of [aliPurchase, spotifyPurchase, partial, partialPurchase, receipt]) {
+      expect(fixed.get(id)).toMatchObject({ isTransfer: false, transferAccountId: null });
+    }
+
+    await reclassifyAll(db());
+    expect(await byId([...fixed.keys()])).toEqual(fixed);
+    expect(await summary(db(), admin, range([dkb, paypal]))).toEqual(after);
+
+    await importBookings(db(), paypal, [{ ...booking("Teeladen", -1_299), bookingDate: "2026-11-16" }], "test");
+    const { ids } = await importBookings(
+      db(),
+      dkb,
+      [
+        {
+          ...booking("PayPal Europe S.a.r.l. et Cie", -1_299, "PP.8422.PP . Teeladen, Ihr Einkauf bei Teeladen"),
+          bookingDate: "2026-11-18",
+        },
+      ],
+      "test",
+    );
+    // A bank sync reclassifies right after storing its bookings.
+    await reclassifyAll(db());
+    const [imported] = ids as [number];
+    expect((await byId([imported])).get(imported)).toMatchObject({ isTransfer: true, transferAccountId: paypal });
+  });
+
+  it("keeps a manual decision on the bank debit", async () => {
+    const dkb = await dkbId();
+    const paypal = await createAccount(db(), admin, { name: "PayPal", bank: "paypal", kind: "checking", color: "#000000" });
+    await importBookings(db(), paypal, [{ ...booking("AliExpress", -4_999), bookingDate: "2026-11-03" }], "test");
+    const { ids } = await importBookings(
+      db(),
+      dkb,
+      [{ ...booking("PayPal Europe S.a.r.l. et Cie", -4_999), bookingDate: "2026-11-04" }],
+      "test",
+    );
+    const [debit] = ids as [number];
+    await reclassifyAll(db());
+    expect((await byId([debit])).get(debit)).toMatchObject({ isTransfer: true, transferAccountId: paypal });
+    await patchTransaction(db(), admin, { id: debit, isTransfer: false });
+    await reclassifyAll(db());
+    expect((await byId([debit])).get(debit)).toMatchObject({ isTransfer: false, transferManual: true });
   });
 });

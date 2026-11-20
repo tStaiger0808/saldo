@@ -297,8 +297,8 @@ describe("contracts", () => {
     await saveContractPreferences(db(), admin, { dueSoonDays: 30 });
     const overview = await contractsOverview(db(), admin, {}, TODAY);
     expect(overview.totals).toEqual({ incomeCents: 352_000, expensesCents: 145_000 + 12_000 + 30_000, bufferCents: 165_000, count: 4 });
+    // Only money going out is due; the salary never shows up here.
     expect(overview.upcoming.map((c) => [c.name, c.state.nextDue])).toEqual([
-      ["Gehalt", "2026-11-28"],
       ["Sparplan", "2026-12-02"],
       ["Miete", "2026-12-03"],
     ]);

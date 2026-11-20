@@ -74,6 +74,132 @@ test("the accounts overview lists the accounts by group, bank and kind", async (
   await page.getByRole("region", { name: "Girokonten" }).getByRole("button", { name: "2 Konten" }).click();
 });
 
+test("a click anywhere on a group header folds the group, while its total and ⋯ menu do not", async () => {
+  await page.goto("/konten");
+  const mine = page.getByRole("region", { name: "Meine Konten" });
+  const head = mine.locator(".account-section-head");
+  const toggle = head.getByRole("button", { name: /^Meine Konten \d+ Konten$/ });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(toggle).toHaveAttribute("aria-controls", (await mine.getByRole("list").getAttribute("id")) ?? "");
+  await expect(mine.locator("a.account-row")).toHaveCount(4);
+
+  const box = (await head.boundingBox()) ?? { width: 0, height: 0 };
+  await head.click({ position: { x: box.width / 2, y: box.height - 4 } });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(mine.getByRole("link")).toHaveCount(0);
+  await head.click({ position: { x: 6, y: 6 } });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+  await head.locator(".account-section-total").click();
+  await head.getByRole("button", { name: "Aktionen für Meine Konten" }).click();
+  await expect(page.getByRole("menuitem", { name: "Gruppen verwalten" })).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+
+  await toggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("Space");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(mine.locator("a.account-row")).toHaveCount(4);
+});
+
+/** Folds the chart of `card` and checks that only the chart and its controls go, not the figures above it. */
+async function foldChart(card: ReturnType<Page["getByRole"]>) {
+  const toggle = card.getByRole("button", { name: "Saldoverlauf einklappen" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const body = page.locator(`[id="${await toggle.getAttribute("aria-controls")}"]`);
+  await expect(body.getByRole("slider")).toBeVisible();
+  await toggle.click();
+  await expectChartFolded(card);
+}
+
+async function expectChartFolded(card: ReturnType<Page["getByRole"]>) {
+  const toggle = card.getByRole("button", { name: "Saldoverlauf ausklappen" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(card.getByRole("slider")).toBeHidden();
+  await expect(card.getByRole("group", { name: "Zeitraum" })).toBeHidden();
+  await expect(card.locator(".timeline-period")).toBeVisible();
+  await expect(card.getByText("Eingänge")).toBeVisible();
+  await expect(card.getByText("Ausgänge")).toBeVisible();
+}
+
+async function unfoldChart(card: ReturnType<Page["getByRole"]>) {
+  await card.getByRole("button", { name: "Saldoverlauf ausklappen" }).click();
+  await expect(card.getByRole("button", { name: "Saldoverlauf einklappen" })).toHaveAttribute("aria-expanded", "true");
+  await expect(card.getByRole("slider")).toBeVisible();
+}
+
+/** The page as the server sends it, with only the inline head script running: what shows before hydration. */
+async function beforeHydration(path: string, check: (preview: Page) => Promise<void>) {
+  const preview = await page.context().newPage();
+  await preview.route(/\.m?js(\?.*)?$/, (route) => route.abort());
+  await preview.goto(path);
+  await check(preview);
+  await preview.close();
+}
+
+test("the balance chart folds on the overview and on account pages, each remembered across reloads", async () => {
+  await page.goto("/konten");
+  const total = page.getByRole("region", { name: "Gesamtsaldo" });
+  await foldChart(total);
+  await expect(total).toContainText("5 Konten");
+  await expect(total.locator(".accounts-total-value")).toBeVisible();
+  await page.reload();
+  await expectChartFolded(total);
+  await beforeHydration("/konten", async (preview) => {
+    await expect(preview.locator(".accounts-total .timeline-period")).toBeVisible();
+    await expect(preview.locator(".accounts-total .timeline-body")).toBeHidden();
+  });
+
+  await page.getByRole("link", { name: new RegExp(ACCOUNT) }).click();
+  const history = page.getByRole("region", { name: "Saldoverlauf" });
+  await expect(history.getByRole("button", { name: "Saldoverlauf einklappen" })).toBeVisible();
+  await foldChart(history);
+  await page.reload();
+  await expectChartFolded(history);
+  const detail = page.url();
+  await beforeHydration(detail, async (preview) => {
+    await expect(preview.locator(".timeline-period")).toBeVisible();
+    await expect(preview.locator(".timeline-body")).toBeHidden();
+  });
+
+  await page.goto("/konten");
+  await expectChartFolded(total);
+  // Earlier specs may list it in two groups.
+  await page
+    .getByRole("link", { name: /^ING Extra-Konto/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { level: 1, name: "ING Extra-Konto" })).toBeVisible();
+  await expectChartFolded(page.getByRole("region", { name: "Saldoverlauf" }));
+
+  for (const mode of ["hell", "dunkel"] as const) {
+    await setMode(page, mode);
+    for (const path of ["/konten", detail]) {
+      await page.goto(path);
+      await page.waitForLoadState("networkidle");
+      await expectNoAxeViolations(page, `${path} mit eingeklapptem Verlauf (${mode})`);
+    }
+  }
+  await setMode(page, "hell");
+  await page.setViewportSize({ width: 375, height: 740 });
+  for (const path of ["/konten", detail]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    await expectNoHorizontalScroll(page);
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  await page.goto(detail);
+  await unfoldChart(page.getByRole("region", { name: "Saldoverlauf" }));
+  await page.goto("/konten");
+  await expectChartFolded(total);
+  await unfoldChart(total);
+  await page.reload();
+  await expect(total.getByRole("button", { name: "Saldoverlauf einklappen" })).toHaveAttribute("aria-expanded", "true");
+});
+
 test("an account opens its detail page with balance, chart and the bookings table with totals", async () => {
   await page.goto("/konten");
   await page.getByRole("link", { name: new RegExp(ACCOUNT) }).click();

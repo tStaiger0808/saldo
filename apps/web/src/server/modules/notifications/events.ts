@@ -251,6 +251,7 @@ export async function checkUpcomingContracts(db: Db, today: string): Promise<voi
     const f = formatter(s.locale);
     const ahead = thresholdOf(s, "contract_upcoming");
     for (const c of await listContracts(db, s.viewer, {}, today)) {
+      if (c.direction !== "expense") continue;
       const due = c.state.nextDue;
       const left = core.dueWithin(c.state, today, ahead);
       if (due === null || left === null) continue;
@@ -260,7 +261,7 @@ export async function checkUpcomingContracts(db: Db, today: string): Promise<voi
           left === 0
             ? t(s.locale, "notifications.contractUpcomingToday", { name: c.name })
             : t(s.locale, "notifications.contractUpcomingIn", { name: c.name, count: left }),
-        body: t(s.locale, c.direction === "income" ? "notifications.contractUpcomingIncome" : "notifications.contractUpcomingExpense", {
+        body: t(s.locale, "notifications.contractUpcomingExpense", {
           amount: f.euro(c.state.expectedCents),
           date: f.date(due),
         }),

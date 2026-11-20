@@ -102,12 +102,12 @@ export function Amount({ cents, currency, unit = false }: { cents: number; curre
   );
 }
 
-/** An account balance is a state, not a flow: neutral without a plus sign, red with a real minus when negative. */
+/** An account balance: green above zero, red with a real minus below, neutral at zero; no plus sign, it is a state. */
 export function Balance({ cents, unit = false }: { cents: number | null; unit?: boolean }) {
   const f = useFormat();
   if (cents === null) return <span className="amount">–</span>;
   return (
-    <Money className={cents < 0 ? "amount amount-out" : "amount"} unit={unit}>
+    <Money className={amountTone(cents)} unit={unit}>
       {cents < 0 ? f.signed(cents) : f.euro(cents)}
     </Money>
   );

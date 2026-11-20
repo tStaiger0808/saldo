@@ -1,7 +1,7 @@
 import { type AiRuleCleanup, type ClassifyRule, classify, planAiRuleCleanup } from "@saldo/core";
 import { eq, getTableColumns, inArray } from "drizzle-orm";
 import type { Db } from "../../db/index.ts";
-import { accounts, categories, rules, ruleTags, transactions, transactionTags } from "../../db/schema.ts";
+import { accounts, bankConnections, categories, rules, ruleTags, transactions, transactionTags } from "../../db/schema.ts";
 
 /** All rules with their tags and the kind of their category, as classification needs them. */
 export async function loadClassifyRules(db: Db): Promise<(typeof rules.$inferSelect & ClassifyRule)[]> {
@@ -22,8 +22,13 @@ export async function reclassifyAll(db: Db): Promise<void> {
       transferPatterns: accounts.transferPatterns,
       ownerUserId: accounts.ownerUserId,
       visibility: accounts.visibility,
+      name: accounts.name,
+      bank: accounts.bank,
+      connectionName: bankConnections.name,
+      connectionBank: bankConnections.bank,
     })
-    .from(accounts);
+    .from(accounts)
+    .leftJoin(bankConnections, eq(bankConnections.id, accounts.connectionId));
   const classifyRules = await loadClassifyRules(db);
   const txns = await db.select().from(transactions);
   const tagRows = await db.select().from(transactionTags);
@@ -37,7 +42,8 @@ export async function reclassifyAll(db: Db): Promise<void> {
     currentTags.set(row.transactionId, [...(currentTags.get(row.transactionId) ?? []), { id: row.tagId, source: row.source }]);
   }
 
-  const result = classify(txns, accountRows, classifyRules);
+  const classifyAccounts = accountRows.map((a) => ({ ...a, names: [a.bank, a.name, a.connectionBank, a.connectionName] }));
+  const result = classify(txns, classifyAccounts, classifyRules);
   await db.transaction(async (tx) => {
     for (const txn of txns) {
       const next = result.get(txn.id);

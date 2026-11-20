@@ -106,6 +106,13 @@ test.afterAll(async () => {
 const pendingRows = () => page.locator("tr.pending-row");
 
 /** The account's page without filters; the link of an account with new bookings opens just those. */
+/** Fetches the account's connection from its "⋯" menu on the accounts page. */
+async function syncFromMenu(name: string) {
+  await page.goto("/konten");
+  await page.getByRole("button", { name: `Aktionen für ${name}` }).click();
+  await page.getByRole("menuitem", { name: "Abrufen", exact: true }).click();
+}
+
 async function accountPage(name: string) {
   await page.goto("/konten");
   const href =
@@ -163,8 +170,7 @@ test("the account page lists only its own pending bookings, also when sorted by 
 });
 
 test("a fetch shows the bank's pending booking; once booked it is there exactly once, as a booking", async () => {
-  await page.goto("/konten");
-  await page.getByRole("button", { name: new RegExp(`^Abrufen\\s*: ${SYNCED}`) }).click();
+  await syncFromMenu(SYNCED);
   await expect(page.locator(".toast").filter({ hasText: SYNCED })).toBeVisible();
   await accountPage(SYNCED);
   const bookings = page.getByRole("region", { name: "Buchungen", exact: true });
@@ -177,8 +183,7 @@ test("a fetch shows the bank's pending booking; once booked it is there exactly 
   await expect(figure(bookings.getByRole("region", { name: TOTALS }), "Anzahl")).toHaveText("1");
 
   await fetch(`${FAKE_BANK}${FAKE_EB_BOOK_PATH}`, { method: "POST" });
-  await page.goto("/konten");
-  await page.getByRole("button", { name: new RegExp(`^Abrufen\\s*: ${SYNCED}`) }).click();
+  await syncFromMenu(SYNCED);
   await expect(page.locator(".toast").filter({ hasText: `${SYNCED}: 1 neue Buchung` })).toBeVisible();
   await accountPage(SYNCED);
   await expect(bookings.locator("tr.pending-row")).toHaveCount(0);

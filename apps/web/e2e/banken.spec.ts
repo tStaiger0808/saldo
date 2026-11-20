@@ -474,6 +474,34 @@ test("a consent without accounts explains the control panel step and offers rene
   await row.getByRole("button", { name: "Aktionen für Bank Norwegian" }).click();
   await expect(page.getByRole("menuitem", { name: "Löschen" })).toBeVisible();
   await page.keyboard.press("Escape");
+
+  const fold = pending.getByRole("button", { name: "Angefangene Bankverbindungen einklappen" });
+  await expect(fold).toHaveAttribute("aria-expanded", "true");
+  await fold.click();
+  const unfold = pending.getByRole("button", { name: "Angefangene Bankverbindungen ausklappen" });
+  await expect(unfold).toHaveAttribute("aria-expanded", "false");
+  await expect(row).toBeHidden();
+  await page.reload();
+  await expect(unfold).toHaveAttribute("aria-expanded", "false");
+  await expect(row).toBeHidden();
+  const preview = await page.context().newPage();
+  await preview.route(/\.m?js(\?.*)?$/, (route) => route.abort());
+  await preview.goto("/konten");
+  await expect(preview.getByRole("heading", { name: "Angefangene Bankverbindungen" })).toBeVisible();
+  await expect(preview.locator('[data-fold="konten-angefangen"]')).toBeHidden();
+  await preview.close();
+  for (const mode of ["hell", "dunkel"] as const) {
+    await setMode(page, mode);
+    await page.goto("/konten");
+    await expect(unfold).toBeVisible();
+    await expectNoAxeViolations(page, `Angefangene Verbindungen eingeklappt (${mode})`);
+  }
+  await setMode(page, "hell");
+  await page.goto("/konten");
+  await unfold.click();
+  await expect(fold).toHaveAttribute("aria-expanded", "true");
+  await expect(row).toBeVisible();
+
   for (const mode of ["hell", "dunkel"] as const) {
     await setMode(page, mode);
     await page.goto("/konten?abruf=hinweis&meldung=Die%20Bank%20hat%20keine%20Konten%20freigegeben.");

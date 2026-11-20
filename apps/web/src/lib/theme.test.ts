@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FOLDED_KEY } from "./fold.ts";
 import { DEFAULT_THEME, HEAD_SCRIPT, RENAMED_THEMES, readTheme, THEME_KEY, THEMES, themeFor } from "./theme.ts";
 
 let storage: Map<string, string>;
@@ -85,5 +86,16 @@ describe("head script", () => {
     });
     new Function(HEAD_SCRIPT)();
     expect(root.dataset.theme).toBe("schiefer");
+  });
+
+  it("marks the folded sections it knows and leaves the attribute out without any", () => {
+    storage.set(FOLDED_KEY, "konto-verlauf toString konten-angefangen");
+    new Function(HEAD_SCRIPT)();
+    expect(root.dataset.folded).toBe("konto-verlauf konten-angefangen");
+
+    root.dataset = {};
+    storage.set(FOLDED_KEY, "");
+    new Function(HEAD_SCRIPT)();
+    expect(root.dataset.folded).toBeUndefined();
   });
 });

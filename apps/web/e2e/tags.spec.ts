@@ -131,7 +131,7 @@ test("a categorization creates a tag marked 'von KI', which the tags page filter
     await page.goto("/einstellungen/tags");
     await expect(row).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
-  await expect(row.getByText("von KI", { exact: true })).toBeVisible();
+  await expect(row.getByText("von KI", { exact: true })).toHaveCount(0);
   await expect(row).toContainText(/\d+ Buchung/);
 
   await page.getByRole("button", { name: "Tag anlegen" }).click();
@@ -140,13 +140,8 @@ test("a categorization creates a tag marked 'von KI', which the tags page filter
   await dialog.getByRole("button", { name: "Tag anlegen" }).click();
   const own = page.getByRole("listitem").filter({ hasText: OWN_TAG });
   await expect(own).toBeVisible();
-  await expect(own.getByText("von KI", { exact: true })).toHaveCount(0);
-
-  const onlyAi = page.getByRole("checkbox", { name: "Nur von der KI angelegte" });
-  await onlyAi.check();
-  await expect(own).toBeHidden();
-  await expect(row).toBeVisible();
-  await expectNoAxeViolations(page, "Tags mit Filter (hell)");
+  await expect(page.getByRole("checkbox", { name: "Nur von der KI angelegte" })).toHaveCount(0);
+  await expectNoAxeViolations(page, "Tags (hell)");
 
   const openMerge = async () => {
     await page.getByRole("button", { name: `Aktionen für ${AI_TAG}` }).click();
@@ -166,17 +161,15 @@ test("a categorization creates a tag marked 'von KI', which the tags page filter
   await setMode(page, "dunkel");
   await page.goto("/einstellungen/tags");
   await page.waitForLoadState("networkidle");
-  await page.getByRole("checkbox", { name: "Nur von der KI angelegte" }).check();
-  await expect(row.getByText("von KI", { exact: true })).toBeVisible();
-  await expectNoAxeViolations(page, "Tags mit Filter (dunkel)");
+  await expect(row).toBeVisible();
+  await expectNoAxeViolations(page, "Tags (dunkel)");
   merge = await openMerge();
   await expectNoAxeViolations(page, "Zusammenführen (dunkel)");
 
   await merge.getByLabel("Zusammenführen mit").selectOption({ label: OWN_TAG });
   await merge.getByRole("button", { name: "Zusammenführen" }).click();
   await expect(page.getByRole("status").filter({ hasText: `„${AI_TAG}“ mit „${OWN_TAG}“ zusammengeführt.` })).toBeVisible();
-  await expect(page.getByText("Keine von der KI angelegten Tags.")).toBeVisible();
-  await page.getByRole("checkbox", { name: "Nur von der KI angelegte" }).uncheck();
+  await expect(row).toBeHidden();
   await expect(own).toContainText(/[1-9]\d* Buchung/);
   await setMode(page, "hell");
 });

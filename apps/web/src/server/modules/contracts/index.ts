@@ -218,7 +218,8 @@ async function present(
       mine: c.ownerUserId === viewer.id,
       canManage: canManage(viewer, { ownerUserId: c.ownerUserId, visibility }),
       state,
-      dueInDays: core.dueWithin(state, today, dueSoonDays),
+      // Only money going out is "due"; an incoming payment is nothing to prepare for.
+      dueInDays: c.direction === "expense" ? core.dueWithin(state, today, dueSoonDays) : null,
     };
   });
 }

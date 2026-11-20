@@ -2,7 +2,7 @@ import { definePlugin } from "nitro";
 import { closeDatabase, db } from "../db/index.ts";
 import { env } from "../env.ts";
 import { closeAbandonedRuns } from "../modules/backup/index.ts";
-import { cleanupAiRules } from "../modules/classification/index.ts";
+import { cleanupAiRules, reclassifyAll } from "../modules/classification/index.ts";
 import { relinkContracts } from "../modules/contracts/index.ts";
 import { ensureVapidKeys } from "../modules/notifications/index.ts";
 import { seedDefaults } from "../modules/seed/index.ts";
@@ -20,6 +20,8 @@ export default definePlugin(async (nitroApp) => {
   const cleanup = await cleanupAiRules(db());
   if (cleanup.remove.length + cleanup.narrow.length > 0)
     console.info(`AI rule cleanup: removed ${cleanup.remove.length}, gave ${cleanup.narrow.length} a direction`);
+  // A newer transfer detection reaches stored bookings; only changed rows are written.
+  if (cleanup.remove.length + cleanup.narrow.length === 0) await reclassifyAll(db());
   // Payees filled in above, or a newer matching, can change which bookings belong to a contract.
   await relinkContracts(db());
   await closeAbandonedRuns(db());

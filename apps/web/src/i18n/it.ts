@@ -7,6 +7,8 @@ export const it = {
     cancel: "Annulla",
     delete: "Elimina",
     edit: "Modifica",
+    collapse: "Comprimi {name}",
+    expand: "Espandi {name}",
     close: "Chiudi",
     add: "Aggiungi",
     create: "Crea",
@@ -1771,9 +1773,6 @@ export const it = {
       deleteText: "Il tag viene rimosso da tutti i movimenti e da tutte le regole.",
       intro:
         "I tag raggruppano i movimenti oltre le categorie, per esempio «Vacanze» o «Home office». I tag con l’indicazione «dall’IA» li ha creati l’IA; controllali ogni tanto.",
-      aiBadge: "dall’IA",
-      onlyAi: "Solo quelli creati dall’IA",
-      noneFromAi: "Nessun tag creato dall’IA.",
       bookings: { zero: "Nessun movimento", one: "{count} movimento", other: "{count} movimenti" },
       rename: "Rinomina",
       merge: "Unisci",
@@ -2237,7 +2236,6 @@ export const it = {
     contractUpcomingToday: "{name}: in scadenza oggi",
     contractUpcomingIn: { one: "{name}: in scadenza domani", other: "{name}: in scadenza tra {count} giorni" },
     contractUpcomingExpense: "Addebito previsto di circa {amount} il {date}.",
-    contractUpcomingIncome: "Accredito previsto di circa {amount} il {date}.",
   },
   accounts: {
     title: "Conti",
