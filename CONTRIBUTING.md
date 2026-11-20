@@ -20,7 +20,8 @@ Coding-Agents gleichermaßen.
 Zwei dauerhafte Branches:
 
 - **`main`** – der veröffentlichte Stand. Ist geschützt: Änderungen nur per Pull Request aus `develop`.
-- **`develop`** – der Integrationsstand. Hier landen alle neuen Funktionen und Fehlerbehebungen zuerst.
+- **`develop`** – der Integrationsstand. Hier landen alle neuen Funktionen und Fehlerbehebungen zuerst. Der Inhaber
+  arbeitet während der Aufbauphase direkt auf `develop`; Beiträge kommen per Pull Request.
 
 So läuft eine Änderung:
 
